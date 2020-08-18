@@ -102,7 +102,7 @@ typedef struct
 	UINT16 directories_count;
 	BYTE padding[2];
 	BYTE reserved[12];
-} EXT2_GROUP_DESCRIPTOR;
+} EXT2_GROUP_DESCRIPTOR; // 정보입력
 
 typedef struct
 {

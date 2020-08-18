@@ -1,4 +1,4 @@
-typedef struct
+ typedef struct
 {
 	char*	address;
 } DISK_MEMORY;
@@ -136,10 +136,10 @@ int ext2_format(DISK_OPERATIONS* disk)
 
 	// block bitmap
 	ZeroMemory(sector, sizeof(sector));
-
-	sector[0] = 0xff;
-	sector[1] = 0xff;
-	sector[2] = 0x01;
+ 
+	sector[0] = 0xff;//11111111
+	sector[1] = 0xff;//11111111
+	sector[2] = 0x01;//00000001
 	disk->write_sector(disk, BOOT_SECTOR_BASE + 2, sector);
 
 	// inode bitmap
