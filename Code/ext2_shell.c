@@ -174,7 +174,7 @@ int fs_mount(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, SHELL_ENTRY* ro
 	}
 
 	printf("%s", ext2_entry.entry.name);
-	ext2_entry_to_shell_entry(fs, &ext2_entry, root);
+	ext2_entry_to_shell_entry(fs, &ext2_entry, root); //&ext2_entry를 root에 먹임
 
 	return result;
 }
