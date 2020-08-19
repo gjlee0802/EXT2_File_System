@@ -100,6 +100,7 @@ int ext2_write(EXT2_NODE* file, unsigned long offset, unsigned long length, cons
 
 UINT32 get_free_inode_number(EXT2_FILESYSTEM* fs);
 
+//jump
 int ext2_format(DISK_OPERATIONS* disk)
 {
 	EXT2_SUPER_BLOCK sb;
@@ -145,14 +146,15 @@ int ext2_format(DISK_OPERATIONS* disk)
 	// inode bitmap
 	ZeroMemory(sector, sizeof(sector));
 
-	sector[0] = 0xff;
-	sector[1] = 0x03;
+	sector[0] = 0xff;	// 1111 1111
+	sector[1] = 0x03;	// 0000 0011
+	// inode가 10까지 사용 중.
 	disk->write_sector(disk, BOOT_SECTOR_BASE + 3, sector);
 
 	// inode table
 	ZeroMemory(sector, sizeof(sector));
 
-	for (i = 4; i < sb.first_data_block_each_group; i++)
+	for (i = gd.start_block_of_inode_table; i < sb.first_data_block_each_group; i++)
 		disk->write_sector(disk, BOOT_SECTOR_BASE + i, sector);
 
 	for (gi = 1; gi < NUMBER_OF_GROUPS; gi++)
@@ -185,7 +187,7 @@ int ext2_format(DISK_OPERATIONS* disk)
 
 		// inode table
 		ZeroMemory(sector, sizeof(sector));
-		for (i = 4; i < sb.first_data_block_each_group; i++)
+		for (i = gd.start_block_of_inode_table; i < sb.first_data_block_each_group; i++)
 			disk->write_sector(disk, sector_num_per_group * gi + BOOT_SECTOR_BASE + i, sector);
 	}
 
@@ -433,8 +435,48 @@ int find_entry_on_data(EXT2_FILESYSTEM* fs, INODE first, const BYTE* formattedNa
 {
 }
 
+//jump
+int get_inode_table_block(EXT2_FILESYSTEM* fs, const UINT32 inode, BYTE* inodeTableSector, int *begin)
+{
+	QWORD sector_num_per_group = (fs->disk->numberOfSectors - 1) / NUMBER_OF_GROUPS;
+	const int BOOT_SECTOR_BASE = 1;
+	int group_number, ret;
+
+	group_number = (inode-1) / fs->sb.inode_per_group;
+	*begin = fs->sb.inode_per_group * group_number;
+	ret = fs->disk->read_sector(fs->disk, sector_num_per_group * group_number + BOOT_SECTOR_BASE + fs->gd.start_block_of_inode_table, inodeTableSector);
+
+	return ret;
+}
+
+int prepare_inode_table_block(EXT2_FILESYSTEM* fs, const UINT32 inode, BYTE* inodeTableSector, int* begin)// 예외처리 필요
+{
+	get_inode_table_block(fs, inode, inodeTableSector, begin);
+}
+
 int get_inode(EXT2_FILESYSTEM* fs, const UINT32 inode, INODE *inodeBuffer)
 {
+	BYTE sector[MAX_SECTOR_SIZE];
+	int i, begin;
+	DWORD sectorOffset;
+
+	ZeroMemory(sector, sizeof(sector));
+
+	prepare_inode_table_block(fs, inode, sector, &begin);
+	printf("inode : %d\nbegin : %d\n", inode, begin);
+	inodeBuffer = (INODE *)sector;	// begin block of the inode Table
+
+	for(i = begin+1; i < inode; i++)
+	{
+		inodeBuffer++;
+	}
+	printf("%d : %u\n", i, inodeBuffer->blocks);
+	printf("size: %u\n", i, inodeBuffer->size);
+	/*
+	ip->mode = 0x1FF | 0x4000;
+	ip->size = 0;
+	ip->blocks = 1;
+	*/
 }
 
 int read_root_sector(EXT2_FILESYSTEM* fs, BYTE* sector)
@@ -443,6 +485,7 @@ int read_root_sector(EXT2_FILESYSTEM* fs, BYTE* sector)
 	INODE inodeBuffer;
 	SECTOR rootBlock;
 	get_inode(fs, inode, &inodeBuffer);
+	printf("root blocks : %u\n", inodeBuffer.blocks);
 	rootBlock = get_data_block_at_inode(fs, inodeBuffer, 1);
 
 	return data_read(fs, 0, rootBlock, sector);
