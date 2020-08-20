@@ -657,28 +657,34 @@ int ext2_read_superblock(EXT2_FILESYSTEM* fs, EXT2_NODE* root)
 
 UINT32 get_free_inode_number(EXT2_FILESYSTEM* fs)
 {
-	
-	
 	BYTE sector[MAX_SECTOR_SIZE];
 	UINT32 inodebitmap_block = 1+fs->gd.start_block_of_inode_bitmap;
+	
 	data_read(fs, 0, inodebitmap_block, sector);
 	UINT32 i;
-	UINT32 begin = 0;
-	UINT32 last = MAX_SECTOR_SIZE;// / 8 ;
-	for( i = begin; i <= last; i++ )
-	{
-		int j=1;
-		BYTE bit = sector[i];
-		while(j<9){
-			if(bit & 0x01==0){
-				return 8*i+j;
+	UINT32 begin=0; 
+	UINT32 number_of_blocks_for_group = (fs->disk->numberOfSectors-1)/2;
+	UINT32 end_of_inode_table = (number_of_blocks_for_group-fs->sb.first_data_block_each_group)/8; 
+		//한 그룹당 아이노드 테이블의 sector 마지막 인덱스
+		//데이터 영역 블록 수 = 그룹당 블록개수 - 데이터 영역 이전 블록개수
+	UINT32 last = end_of_inode_table;
+	while(last/end_of_inode_table > NUMBER_OF_GROUPS){// 그룹 수보다 만큼 반복
+		for( i = begin; i < last; i++ )
+		{
+			int j=1;
+			BYTE bit = sector[i];
+			while(j<9){
+				if(bit & 0x01==0 && 8*i+j>10){ //비트가 0이고 아이노드넘버가 10 초과이면
+					return 8*i+j;
+				}
+				bit >>1;
+				j++;
 			}
-			bit >>1;
-			j++;
-		}
-	}
-	// 내일 2번째 그룹 확인하는 경우도 작성해야 함
-	
+		}//그룹 하나 돌고
+		begin = last ; //다 돌았으면 다음그룹
+		last = last + end_of_inode_table;		
+	} 
+	return EXT2_ERROR; 
 }
 
 int set_inode_onto_inode_table(EXT2_FILESYSTEM *fs, const UINT32 which_inode_num_to_write, INODE * inode_to_write)
