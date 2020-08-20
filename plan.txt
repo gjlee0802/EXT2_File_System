@@ -1,0 +1,43 @@
+자료구조
+done
+
+to do
+
+명령어
+- done
+	format
+
+- to do
+	mount
+		get_inode, get_data_block_at_inode
+
+-------------------------------------
+command | to do |
+
+format | done
+mount | ext2_entry_to_shell_entry - get_inode, get_data_block_at_inode
+touch | ext2_create-(lookup_entry, insert_entry)
+fill | ext2_create-(lookup_entry, insert_entry), fs_lookup-lookup_entry, fs_write 
+ls | ext2_read_dir - (get_inode,get_data_block_at_inode), 
+mkdir | ext2_entry_to_shell_entry- get_inode,  ext2_mkdir-(insert_entry, expand_block)
+shell_cmd_mkdirst | fs_mkdir
+cd | fs_lookup-lookup_entry
+df | fs_stat
+remove | fs_remove,아예만들어야함
+rmdir | 아예만들어야함
+cat | fs_lookup-lookup_entry, fs_read
+shell_cmd_dump~~~ | fs_dumpDataSector는 되어있는 듯, fs_dump~~~ - (ext2_lookup,get_inode)
+get_free_inode_number
+set_inode_onto_inode_table
+
+inode관련 함수 구현
+경주
+	- get_inode
+	- get_data_block_at_inode
+	- 
+
+lookup_up 관련 
+성호
+
+fs_read, fs_remove, fs_stat 등등 미구현함수
+하늘
