@@ -465,18 +465,14 @@ int get_inode(EXT2_FILESYSTEM* fs, const UINT32 inode, INODE *inodeBuffer)
 	prepare_inode_table_block(fs, inode, sector, &begin);
 	printf("inode : %d\nbegin : %d\n", inode, begin);
 	inodeBuffer = (INODE *)sector;	// begin block of the inode Table
-
+	
 	for(i = begin+1; i < inode; i++)
 	{
 		inodeBuffer++;
+		
 	}
 	printf("%d : %u\n", i, inodeBuffer->blocks);
-	printf("size: %u\n", i, inodeBuffer->size);
-	/*
-	ip->mode = 0x1FF | 0x4000;
-	ip->size = 0;
-	ip->blocks = 1;
-	*/
+	printf("size: %u\n", inodeBuffer->size);
 }
 
 int read_root_sector(EXT2_FILESYSTEM* fs, BYTE* sector)
