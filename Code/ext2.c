@@ -146,7 +146,7 @@ int ext2_format(DISK_OPERATIONS* disk)
 	ZeroMemory(sector, sizeof(sector));
 
 	sector[0] = 0xff;//11111111
-	sector[1] = 0x03;//00000011 -> 11000000여야 하는거 아님 ?
+	sector[1] = 0x03;//00000011
 	disk->write_sector(disk, BOOT_SECTOR_BASE + 3, sector);
 
 	// inode table
@@ -310,6 +310,11 @@ int insert_entry(UINT32 inode_num, EXT2_NODE * retEntry, int fileType)
 
 UINT32 get_available_data_block(EXT2_FILESYSTEM * fs, UINT32 inode_num)
 {
+	BYTE sector[MAX_SECTOR_SIZE];
+	UINT32 databitmap_block = 1+ fs->gd.start_block_of_block_bitmap;
+	
+	
+	data_read(fs, 0, databitmap_block, sector);
 }
 
 void process_meta_data_for_block_used(EXT2_FILESYSTEM * fs, UINT32 inode_num)
@@ -659,30 +664,40 @@ UINT32 get_free_inode_number(EXT2_FILESYSTEM* fs)
 {
 	BYTE sector[MAX_SECTOR_SIZE];
 	UINT32 inodebitmap_block = 1+fs->gd.start_block_of_inode_bitmap;
-	
-	data_read(fs, 0, inodebitmap_block, sector);
 	UINT32 i;
-	UINT32 begin=0; 
+	UINT32 begin=0;  
 	UINT32 number_of_blocks_for_group = (fs->disk->numberOfSectors-1)/2;
-	UINT32 end_of_inode_table = (number_of_blocks_for_group-fs->sb.first_data_block_each_group)/8; 
-		//한 그룹당 아이노드 테이블의 sector 마지막 인덱스
-		//데이터 영역 블록 수 = 그룹당 블록개수 - 데이터 영역 이전 블록개수
-	UINT32 last = end_of_inode_table;
-	while(last/end_of_inode_table > NUMBER_OF_GROUPS){// 그룹 수보다 만큼 반복
-		for( i = begin; i < last; i++ )
+	UINT32 max_inode_num_for_group = (number_of_blocks_for_group - fs->sb.first_data_block_each_group)+10; 
+		//한 그룹당 아이노드 비트맵의 마지막 넘버
+		//데이터 영역 블록 수 = 그룹당 블록개수 - 데이터 영역 이전 블록개수 
+		//아이노드 테이블 수 = 예약된 블록 수 + 데이터 영역 블록 수
+	UINT32 last = (max_inode_num_for_group+7) / 8;//(소숫점 생길 경우 올림연산위해 +7)
+	UINT32 group_num = 0;
+	while(group_num < NUMBER_OF_GROUPS){// 그룹 수 만큼 반복
+		data_read(fs, 0, inodebitmap_block, sector);
+		for( i = begin; i < last; i++ ) 
 		{
 			int j=1;
 			BYTE bit = sector[i];
 			while(j<9){
-				if(bit & 0x01==0 && 8*i+j>10){ //비트가 0이고 아이노드넘버가 10 초과이면
-					return 8*i+j;
+				if(8*i+j >10 && bit & 0x01==0){ //비트가 0이고 아이노드넘버가 10 초과이면
+					if (8*i+j>max_inode_num_for_group){ // 그룹당 아이노드 최대 넘버 초과시 다음 그룹으로 이동
+						break;
+					}
+					UINT32 inode_num = 8*i+j + group_num*max_inode_num_for_group;
+					
+					if( inode_num < fs->sb.max_inode_count) //inode_max보다 작은지 검사
+						return inode_num;
+					else
+						return EXT2_ERROR; 
+
 				}
 				bit >>1;
 				j++;
 			}
 		}//그룹 하나 돌고
-		begin = last ; //다 돌았으면 다음그룹
-		last = last + end_of_inode_table;		
+		group_num++; //다 돌았으면 다음그룹
+		inodebitmap_block += number_of_blocks_for_group;
 	} 
 	return EXT2_ERROR; 
 }
