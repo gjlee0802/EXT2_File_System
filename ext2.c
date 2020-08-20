@@ -100,7 +100,6 @@ int ext2_write(EXT2_NODE* file, unsigned long offset, unsigned long length, cons
 
 UINT32 get_free_inode_number(EXT2_FILESYSTEM* fs);
 
-//jump
 int ext2_format(DISK_OPERATIONS* disk)
 {
 	EXT2_SUPER_BLOCK sb;
@@ -243,6 +242,7 @@ int fill_descriptor_block(EXT2_GROUP_DESCRIPTOR * gd, EXT2_SUPER_BLOCK * sb, SEC
 	return EXT2_SUCCESS;
 }
 
+//jump
 int create_root(DISK_OPERATIONS* disk, EXT2_SUPER_BLOCK * sb)
 {
 	BYTE   sector[MAX_SECTOR_SIZE];
@@ -435,7 +435,7 @@ int find_entry_on_data(EXT2_FILESYSTEM* fs, INODE first, const BYTE* formattedNa
 {
 }
 
-//jump
+
 int get_inode_table_block(EXT2_FILESYSTEM* fs, const UINT32 inode, BYTE* inodeTableSector, int *begin)
 {
 	QWORD sector_num_per_group = (fs->disk->numberOfSectors - 1) / NUMBER_OF_GROUPS;
@@ -509,9 +509,46 @@ int ext2_create(EXT2_NODE* parent, char* entryName, EXT2_NODE* retEntry)
 	return EXT2_SUCCESS;
 }
 
-
-int get_data_block_at_inode(EXT2_FILESYSTEM *fs, INODE inode, UINT32 number)
+//jump
+unsigned int get_data_block_at_inode(EXT2_FILESYSTEM *fs, INODE inode, UINT32 number)
 {
+	BYTE sector[MAX_SECTOR_SIZE];
+	unsigned int *block_pointer;
+	if ( (1 <= number) && (number <= 12) )	// direct block
+	{
+		return inode.block[number - 1];
+	}
+	else if ( number <= 12 + MAX_BLOCK_SIZE )	// single indirect block
+	{
+		fs->disk->read_sector(fs->disk, inode.block[12], sector);
+		block_pointer = (unsigned int *)sector;
+		for(int i=0; i < number-12; i++)
+			block_pointer++;
+
+		return *block_pointer;
+	}
+	else if ( number <= 12 + MAX_BLOCK_SIZE * MAX_BLOCK_SIZE )	// double indirect block
+	{
+		fs->disk->read_sector(fs->disk, inode.block[13], sector);
+		block_pointer = (unsigned int *)sector;
+		for(int i=0; i < (number-12-MAX_BLOCK_SIZE)/MAX_BLOCK_SIZE; i++)
+			block_pointer++;
+
+		fs->disk->read_sector(fs->disk, *block_pointer, sector);
+		block_pointer = (unsigned int *)sector;
+		for(int i=0; i < number-12-MAX_BLOCK_SIZE; i++)
+			block_pointer++;
+	}
+	else if ( number <= 12 + MAX_BLOCK_SIZE * MAX_BLOCK_SIZE * MAX_BLOCK_SIZE )	// triple indirect block
+	{
+
+	}
+	else
+	{
+		return EXT2_ERROR;
+	}
+	
+	
 }
 
 int ext2_read_superblock(EXT2_FILESYSTEM* fs, EXT2_NODE* root)
