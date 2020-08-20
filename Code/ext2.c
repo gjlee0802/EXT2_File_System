@@ -312,9 +312,36 @@ UINT32 get_available_data_block(EXT2_FILESYSTEM * fs, UINT32 inode_num)
 {
 	BYTE sector[MAX_SECTOR_SIZE];
 	UINT32 databitmap_block = 1+ fs->gd.start_block_of_block_bitmap;
-	
-	
-	data_read(fs, 0, databitmap_block, sector);
+	UINT32 i;
+	UINT32 begin=0;  
+	UINT32 number_of_blocks_for_group = (fs->disk->numberOfSectors-1)/2;
+	UINT32 max_block_num_for_group = (number_of_blocks_for_group - fs->sb.first_data_block_each_group) + 17; 
+	UINT32 last = (max_block_num_for_group+7) / 8;//(소숫점 생길 경우 올림연산위해 +7)
+	UINT32 group_num = 0;
+	while(group_num < NUMBER_OF_GROUPS){// 그룹 수 만큼 반복
+		data_read(fs, 0, databitmap_block, sector);
+		for( i = begin; i < last; i++ ) 
+		{
+			int j=1;
+			BYTE bit = sector[i];
+			while(j<9){
+				UINT32 data_num = 8*i+j;
+				if (data_num>max_block_num_for_group){ // 그룹당 데이터 최대 넘버 초과시 다음 그룹으로 이동
+						break;
+					}
+				if(data_num >17 && bit & 0x01==0){ //비트가 0이고 데이터 넘버가 17 초과이면	
+				
+					return 1+data_num+group_num*number_of_blocks_for_group;
+						//실제 블록 번호 반환 <디스크를 섹터로 인덱싱 했을때의 해당 블록 번호>
+				}
+				bit >>1;
+				j++;
+			}
+		}//그룹 하나 돌고
+		group_num++; //다 돌았으면 다음그룹
+		databitmap_block += number_of_blocks_for_group; // 한 그룹 뒤 동일 위치에 다음 그룹 아이노드 비트맵 블럭 위치
+	} 
+	return EXT2_ERROR; 
 }
 
 void process_meta_data_for_block_used(EXT2_FILESYSTEM * fs, UINT32 inode_num)
@@ -685,7 +712,7 @@ UINT32 get_free_inode_number(EXT2_FILESYSTEM* fs)
 						break;
 					}
 					UINT32 inode_num = 8*i+j + group_num*max_inode_num_for_group;
-					
+
 					if( inode_num < fs->sb.max_inode_count) //inode_max보다 작은지 검사
 						return inode_num;
 					else
@@ -697,7 +724,7 @@ UINT32 get_free_inode_number(EXT2_FILESYSTEM* fs)
 			}
 		}//그룹 하나 돌고
 		group_num++; //다 돌았으면 다음그룹
-		inodebitmap_block += number_of_blocks_for_group;
+		inodebitmap_block += number_of_blocks_for_group; // 한 그룹 뒤 동일 위치에 다음 그룹 아이노드 비트맵 블럭 위치
 	} 
 	return EXT2_ERROR; 
 }
