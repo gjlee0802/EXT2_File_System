@@ -609,9 +609,44 @@ int find_entry_on_data(EXT2_FILESYSTEM* fs, INODE first, const BYTE* formattedNa
 
 }
 
+
+int get_inode_table_block(EXT2_FILESYSTEM* fs, const UINT32 inode, BYTE* inodeTableSector, int *begin)
+{
+	QWORD sector_num_per_group = (fs->disk->numberOfSectors - 1) / NUMBER_OF_GROUPS;
+	const int BOOT_SECTOR_BASE = 1;
+	int group_number, ret;
+
+	group_number = (inode-1) / fs->sb.inode_per_group;
+	*begin = fs->sb.inode_per_group * group_number;
+	ret = fs->disk->read_sector(fs->disk, sector_num_per_group * group_number + BOOT_SECTOR_BASE + fs->gd.start_block_of_inode_table, inodeTableSector);
+
+	return ret;
+}
+
+int prepare_inode_table_block(EXT2_FILESYSTEM* fs, const UINT32 inode, BYTE* inodeTableSector, int* begin)// 예외처리 필요
+{
+	get_inode_table_block(fs, inode, inodeTableSector, begin);
+}
+
 int get_inode(EXT2_FILESYSTEM* fs, const UINT32 inode, INODE *inodeBuffer)
 {
+	BYTE sector[MAX_SECTOR_SIZE];
+	int i, begin;
+	DWORD sectorOffset;
 
+	ZeroMemory(sector, sizeof(sector));
+
+	prepare_inode_table_block(fs, inode, sector, &begin);
+	printf("inode : %d\nbegin : %d\n", inode, begin);
+	inodeBuffer = (INODE *)sector;	// begin block of the inode Table
+	
+	for(i = begin+1; i < inode; i++)
+	{
+		inodeBuffer++;
+		
+	}
+	printf("%d : %u\n", i, inodeBuffer->blocks);
+	printf("size: %u\n", inodeBuffer->size);
 }
 
 // root 섹터 메타데이터 정해뒀음
