@@ -293,11 +293,12 @@ int create_root(DISK_OPERATIONS* disk, EXT2_SUPER_BLOCK * sb)
 	ip = (INODE *)sector;
 	ip++;
 	ip->mode = 0x1FF | 0x4000;
-	printf("create root mode: %u\n", ip->mode);
 	ip->size = 0;
 	ip->blocks = 1;
 	ip->block[0] = sb->first_data_block_each_group;
-	printf("create blk: %u\n", ip->block[0]);
+
+
+
 	disk->write_sector(disk, BOOT_SECTOR_BASE + 4, sector);
 
 	return EXT2_SUCCESS;
@@ -759,7 +760,6 @@ int ext2_create(EXT2_NODE* parent, char* entryName, EXT2_NODE* retEntry)
 	return EXT2_SUCCESS;
 }
 
-//jump
 int get_data_block_at_inode(EXT2_FILESYSTEM *fs, INODE inode, UINT32 number)
 {
 	BYTE sector[MAX_SECTOR_SIZE];
@@ -769,6 +769,7 @@ int get_data_block_at_inode(EXT2_FILESYSTEM *fs, INODE inode, UINT32 number)
 	indirect_pointer_per_sector = MAX_SECTOR_SIZE / sizeof(UINT32);
 	if ( (1 <= number) && (number <= 12) )	// direct block
 	{
+		printf("get data : %u\n", inode.block[0]);
 		return inode.block[number - 1];
 	}
 	else if ( number <= 12 + indirect_pointer_per_sector )	// single indirect block
@@ -827,7 +828,6 @@ int get_data_block_at_inode(EXT2_FILESYSTEM *fs, INODE inode, UINT32 number)
 	{
 		return EXT2_ERROR;
 	}
-	
 	
 }
 
