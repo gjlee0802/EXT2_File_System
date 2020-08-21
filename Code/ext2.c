@@ -241,7 +241,6 @@ int fill_descriptor_block(EXT2_GROUP_DESCRIPTOR * gd, EXT2_SUPER_BLOCK * sb, SEC
 	return EXT2_SUCCESS;
 }
 
-//jump
 int create_root(DISK_OPERATIONS* disk, EXT2_SUPER_BLOCK * sb)
 {
 	BYTE   sector[MAX_SECTOR_SIZE];
