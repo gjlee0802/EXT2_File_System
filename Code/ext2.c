@@ -344,12 +344,12 @@ UINT32 get_available_data_block(EXT2_FILESYSTEM * fs)//, UINT32 inode_num) //ino
 	return EXT2_ERROR; 
 }
 
-void process_meta_data_for_block_used(EXT2_FILESYSTEM * fs, UINT32 inode_num)
+int process_meta_data_for_block_used(EXT2_FILESYSTEM * fs, UINT32 inode_num)
 {
 	
 }
 
-UINT32 expand_block(EXT2_FILESYSTEM * fs, UINT32 inode_num)
+int expand_block(EXT2_FILESYSTEM * fs, UINT32 inode_num)
 {
 	INODE inodeBuffer;
 	UINT32 new_block;
@@ -361,8 +361,16 @@ UINT32 expand_block(EXT2_FILESYSTEM * fs, UINT32 inode_num)
 	block_number_at_inode = inodeBuffer.blocks + 1;
 	ZeroMemory(sector, 0);
 	memcpy(sector, &new_block, sizeof(new_block));
-	fs->disk->write_sector(fs->disk, get_data_block_at_inode(fs, inodeBuffer, block_number_at_inode), sector);
-	process_meta_data_for_block_used(fs, inode_num);
+	if(fs->disk->write_sector(fs->disk, get_data_block_at_inode(fs, inodeBuffer, block_number_at_inode), sector) == EXT2_ERROR)
+	{
+		return EXT2_ERROR;
+	}
+	if(process_meta_data_for_block_used(fs, inode_num) == EXT2_ERROR)
+	{
+		return EXT2_ERROR;
+	}
+	inodeBuffer.blocks++;
+	return EXT2_SUCCESS;
 }
 
 int meta_read(EXT2_FILESYSTEM * fs, SECTOR group, SECTOR block, BYTE* sector)
