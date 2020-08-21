@@ -293,9 +293,11 @@ int create_root(DISK_OPERATIONS* disk, EXT2_SUPER_BLOCK * sb)
 	ip = (INODE *)sector;
 	ip++;
 	ip->mode = 0x1FF | 0x4000;
+	printf("create root mode: %u\n", ip->mode);
 	ip->size = 0;
 	ip->blocks = 1;
 	ip->block[0] = sb->first_data_block_each_group;
+	printf("create blk: %u\n", ip->block[0]);
 	disk->write_sector(disk, BOOT_SECTOR_BASE + 4, sector);
 
 	return EXT2_SUCCESS;
@@ -363,6 +365,7 @@ UINT32 get_available_data_block(EXT2_FILESYSTEM * fs)//, UINT32 inode_num) //ino
 void process_meta_data_for_block_used(EXT2_FILESYSTEM * fs, UINT32 inode_num)
 {
 	BYTE sector[MAX_SECTOR_SIZE];
+	/*
 	UINT32 group_num=0;
 	if (inode_num > fs->sb.){
 		group_num++;
@@ -374,6 +377,7 @@ void process_meta_data_for_block_used(EXT2_FILESYSTEM * fs, UINT32 inode_num)
 	BYTE marker = 0x01 << j-1;
 	*bit = *bit | marker;
 	data_write(fs, group_num, fs->gd.start_block_of_inode_bitmap, sector);
+	*/
 	fs->sb.free_block_count--;
 	fs->gd.free_blocks_count--;
 	UINT32 gi;
@@ -660,7 +664,7 @@ int find_entry_on_data(EXT2_FILESYSTEM* fs, INODE first, const BYTE* formattedNa
 			{
 				memcpy( &ret->entry, &entry[number], sizeof( EXT2_DIR_ENTRY ) );
 				
-				ret->location.group	= first.gid;
+				ret->location.group	= first.gid; //수정
 				ret->location.block	= currentBlock;
 				ret->location.offset	= number;
 				
@@ -697,25 +701,24 @@ int prepare_inode_table_block(EXT2_FILESYSTEM* fs, const UINT32 inode, BYTE* ino
 	get_inode_table_block(fs, inode, inodeTableSector, begin);
 }
 
-int get_inode(EXT2_FILESYSTEM* fs, const UINT32 inode, INODE *inodeBuffer)
+int* get_inode(EXT2_FILESYSTEM* fs, const UINT32 inode, INODE *inodeBuffer)
 {
 	BYTE sector[MAX_SECTOR_SIZE];
 	int i, begin;
 	DWORD sectorOffset;
+	INODE *inode_ptr;
 
 	ZeroMemory(sector, sizeof(sector));
 
 	prepare_inode_table_block(fs, inode, sector, &begin);
 	printf("inode : %d\nbegin : %d\n", inode, begin);
-	inodeBuffer = (INODE *)sector;	// begin block of the inode Table
+	inode_ptr = (INODE *)sector;	// begin block of the inode Table
 	
 	for(i = begin+1; i < inode; i++)
 	{
-		inodeBuffer++;
-		
+		inode_ptr++;
 	}
-	printf("%d : %u\n", i, inodeBuffer->blocks);
-	printf("size: %u\n", inodeBuffer->size);
+	*inodeBuffer = *inode_ptr;
 }
 
 // root 섹터 메타데이터 정해뒀음
@@ -726,8 +729,8 @@ int read_root_sector(EXT2_FILESYSTEM* fs, BYTE* sector)
 	SECTOR rootBlock;
 	get_inode(fs, inode, &inodeBuffer);
 	rootBlock = get_data_block_at_inode(fs, inodeBuffer, 1);
-
-	return data_read(fs, 0, rootBlock, sector);
+	//return data_read(fs, 0, rootBlock, sector);
+	return fs->disk->read_sector(fs->disk, rootBlock, sector);
 }
 int read_data_sector(EXT2_FILESYSTEM* fs, INODE first, UINT32 currentBlock, BYTE* sector)
 {	
@@ -757,7 +760,7 @@ int ext2_create(EXT2_NODE* parent, char* entryName, EXT2_NODE* retEntry)
 }
 
 //jump
-unsigned int get_data_block_at_inode(EXT2_FILESYSTEM *fs, INODE inode, UINT32 number)
+int get_data_block_at_inode(EXT2_FILESYSTEM *fs, INODE inode, UINT32 number)
 {
 	BYTE sector[MAX_SECTOR_SIZE];
 	unsigned int *block_pointer;
