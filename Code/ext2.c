@@ -791,7 +791,6 @@ int ext2_read_superblock(EXT2_FILESYSTEM* fs, EXT2_NODE* root)
 UINT32 get_free_inode_number(EXT2_FILESYSTEM* fs)
 {
 	BYTE sector[MAX_SECTOR_SIZE];
-	UINT32 inodebitmap_block = 1+;
 	UINT32 i;
 	UINT32 begin=0;  
 	UINT32 number_of_blocks_for_group = (fs->disk->numberOfSectors-1)/2;
