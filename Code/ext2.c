@@ -241,6 +241,7 @@ int fill_descriptor_block(EXT2_GROUP_DESCRIPTOR * gd, EXT2_SUPER_BLOCK * sb, SEC
 	return EXT2_SUCCESS;
 }
 
+//jump
 int create_root(DISK_OPERATIONS* disk, EXT2_SUPER_BLOCK * sb)
 {
 	BYTE   sector[MAX_SECTOR_SIZE];
@@ -685,9 +686,76 @@ int ext2_create(EXT2_NODE* parent, char* entryName, EXT2_NODE* retEntry)
 	return EXT2_SUCCESS;
 }
 
-
-int get_data_block_at_inode(EXT2_FILESYSTEM *fs, INODE inode, UINT32 number)
+//jump
+unsigned int get_data_block_at_inode(EXT2_FILESYSTEM *fs, INODE inode, UINT32 number)
 {
+	BYTE sector[MAX_SECTOR_SIZE];
+	unsigned int *block_pointer;
+	unsigned int indirect_pointer_per_sector;
+	
+	indirect_pointer_per_sector = MAX_SECTOR_SIZE / sizeof(UINT32);
+	if ( (1 <= number) && (number <= 12) )	// direct block
+	{
+		return inode.block[number - 1];
+	}
+	else if ( number <= 12 + indirect_pointer_per_sector )	// single indirect block
+	{
+		fs->disk->read_sector(fs->disk, inode.block[12], sector);		
+		block_pointer = (unsigned int *)sector;
+		for(int i=13; i < number-12; i++)	// 13 ~ 268
+			block_pointer++;
+
+		return *block_pointer;
+	}
+	else if ( number <= 12 + indirect_pointer_per_sector + indirect_pointer_per_sector * indirect_pointer_per_sector )	// double indirect block
+	{
+		int index = (number - 12 - indirect_pointer_per_sector);
+		fs->disk->read_sector(fs->disk, inode.block[13], sector);
+		block_pointer = (unsigned int *)sector;
+		for(int i=0; i < index / indirect_pointer_per_sector; i++)
+		{
+			block_pointer++;			
+		}
+		fs->disk->read_sector(fs->disk, *block_pointer, sector);
+		block_pointer = (unsigned int *)sector;
+		for(int i=1; i < index % indirect_pointer_per_sector; i++)
+		{
+			block_pointer++;
+		}
+
+		return *block_pointer;
+	}
+	else if ( number <= 12 + indirect_pointer_per_sector + indirect_pointer_per_sector * indirect_pointer_per_sector +
+	indirect_pointer_per_sector * indirect_pointer_per_sector * indirect_pointer_per_sector )	// triple indirect block
+	{
+		int index = (number - 12 - indirect_pointer_per_sector - indirect_pointer_per_sector * indirect_pointer_per_sector);
+		fs->disk->read_sector(fs->disk, inode.block[14], sector);
+		block_pointer = (unsigned int *)sector;
+		for(int i=0; i < index / (indirect_pointer_per_sector*indirect_pointer_per_sector); i++)
+		{
+			block_pointer++;
+		}
+		fs->disk->read_sector(fs->disk, *block_pointer, sector);
+		block_pointer = (unsigned int *)sector;
+		for(int i=0; i < index / indirect_pointer_per_sector; i++)
+		{
+			block_pointer++;
+		}
+		fs->disk->read_sector(fs->disk, *block_pointer, sector);
+		block_pointer = (unsigned int *)sector;
+		for(int i=1; i < index % (indirect_pointer_per_sector*indirect_pointer_per_sector); i++)
+		{
+			block_pointer++;
+		}
+
+		return *block_pointer;
+	}
+	else
+	{
+		return EXT2_ERROR;
+	}
+	
+	
 }
 
 int ext2_read_superblock(EXT2_FILESYSTEM* fs, EXT2_NODE* root)
@@ -723,7 +791,6 @@ int ext2_read_superblock(EXT2_FILESYSTEM* fs, EXT2_NODE* root)
 UINT32 get_free_inode_number(EXT2_FILESYSTEM* fs)
 {
 	BYTE sector[MAX_SECTOR_SIZE];
-	UINT32 inodebitmap_block = 1+;
 	UINT32 i;
 	UINT32 begin=0;  
 	UINT32 number_of_blocks_for_group = (fs->disk->numberOfSectors-1)/2;
