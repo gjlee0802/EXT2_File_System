@@ -352,26 +352,17 @@ void process_meta_data_for_block_used(EXT2_FILESYSTEM * fs, UINT32 inode_num)
 UINT32 expand_block(EXT2_FILESYSTEM * fs, UINT32 inode_num)
 {
 	INODE inodeBuffer;
-	get_inode(fs,inode_num,&inodeBuffer);
-	UINT32 i = 0;
-	while(inodeBuffer.block[i]>0 || i<14){
-		//printf(" %d ", inodeBuffer.block[i]);
-		i++;
-	}
-	SECTOR new_block;
+	UINT32 new_block;
+	unsigned int block_number_at_inode;
+	BYTE sector[1024];
+
+	get_inode(fs, inode_num, &inodeBuffer);
 	new_block = get_available_data_block(fs);
-	if(i<12)
-		inodeBuffer.block[i] = new_block;
-	else if (i<13){// indirect
-		
-	}
-	else if (i<14){// double indirect
-
-	}
-	else if (i<15){// triple indirect
-
-	}
-
+	block_number_at_inode = inodeBuffer.blocks + 1;
+	ZeroMemory(sector, 0);
+	memcpy(sector, &new_block, sizeof(new_block));
+	fs->disk->write_sector(fs->disk, get_data_block_at_inode(fs, inodeBuffer, block_number_at_inode), sector);
+	process_meta_data_for_block_used(fs, inode_num);
 }
 
 int meta_read(EXT2_FILESYSTEM * fs, SECTOR group, SECTOR block, BYTE* sector)
@@ -678,8 +669,7 @@ int read_root_sector(EXT2_FILESYSTEM* fs, BYTE* sector)
 	SECTOR rootBlock;
 	get_inode(fs, inode, &inodeBuffer);
 	rootBlock = get_data_block_at_inode(fs, inodeBuffer, 1);
-	//return data_read(fs, 0, rootBlock, sector);
-	return fs->disk->read_sector(fs->disk, rootBlock, sector);
+	return data_read(fs, 0, rootBlock, sector);
 }
 int read_data_sector(EXT2_FILESYSTEM* fs, INODE first, UINT32 currentBlock, BYTE* sector)
 {	
