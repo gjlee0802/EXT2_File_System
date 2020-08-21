@@ -162,11 +162,12 @@ int ext2_format(DISK_OPERATIONS* disk);
 int ext2_create(EXT2_NODE* parent, char* entryName, EXT2_NODE* retEntry);
 int ext2_lookup(EXT2_NODE* parent, const char* entryName, EXT2_NODE* retEntry);
 
-UINT32 expand_block(EXT2_FILESYSTEM * , UINT32 );
+int expand_indirect(EXT2_FILESYSTEM *fs, INODE *inodeBuffer, UINT32 inode_num, const unsigned int block_number);
+int expand_block(EXT2_FILESYSTEM * , UINT32 );
 int fill_super_block(EXT2_SUPER_BLOCK * sb, SECTOR numberOfSectors, UINT32 bytesPerSector);
 int fill_descriptor_block(EXT2_GROUP_DESCRIPTOR * gd, EXT2_SUPER_BLOCK * sb, SECTOR numberOfSectors, UINT32 bytesPerSector);
 int create_root(DISK_OPERATIONS* disk, EXT2_SUPER_BLOCK * sb);
 typedef int(*EXT2_NODE_ADD)(EXT2_FILESYSTEM*,void*, EXT2_NODE*);
-void process_meta_data_for_block_used(EXT2_FILESYSTEM * fs, UINT32 inode_num);
+int process_meta_data_for_block_used(EXT2_FILESYSTEM * fs, UINT32 inode_num);
 #endif
 
