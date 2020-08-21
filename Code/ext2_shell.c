@@ -129,20 +129,20 @@ int fs_format(DISK_OPERATIONS* disk, void* param)
 static SHELL_FILE_OPERATIONS g_file =
 {
 	fs_create,
-	NULL,
-	NULL,
+	NULL, // remove
+	NULL, // read
 	fs_write
 };
 
 static SHELL_FS_OPERATIONS   g_fsOprs =
 {
 	fs_read_dir,
-	NULL,
+	NULL, // fs_stat
 	fs_mkdir,
-	NULL,
+	NULL, // fs_rmdir
 	fs_lookup,
 	&g_file,
-	NULL
+	NULL // 
 };
 
 int fs_mount(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, SHELL_ENTRY* root)
@@ -174,7 +174,7 @@ int fs_mount(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, SHELL_ENTRY* ro
 	}
 
 	printf("%s", ext2_entry.entry.name);
-	ext2_entry_to_shell_entry(fs, &ext2_entry, root);
+	ext2_entry_to_shell_entry(fs, &ext2_entry, root); //&ext2_entry를 root에 먹임
 
 	return result;
 }

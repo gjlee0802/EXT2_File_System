@@ -84,7 +84,7 @@ typedef struct
 	UINT32  blocks;       /* Blocks count */
 	UINT32  flags;        /* File flags */
 	UINT32  i_reserved1;   // OS dependent 1
-	UINT32  block[EXT2_N_BLOCKS];/* Pointers to blocks */
+	UINT32  block[EXT2_N_BLOCKS];/* Pointers to blocks 0~11 다이렉트, 12 인다이렉트,13 이중, 14삼중 */
 	UINT32  generation;   /* File version (for NFS) */
 	UINT32  file_acl;     /* File ACL */
 	UINT32  dir_acl;      /* Directory ACL */
@@ -102,7 +102,7 @@ typedef struct
 	UINT16 directories_count;
 	BYTE padding[2];
 	BYTE reserved[12];
-} EXT2_GROUP_DESCRIPTOR;
+} EXT2_GROUP_DESCRIPTOR; // 정보입력
 
 typedef struct
 {
@@ -128,9 +128,9 @@ typedef struct
 
 typedef struct
 {
-	UINT32 group;
-	UINT32 block;
-	UINT32 offset;
+	UINT32 group; //그룹번호
+	UINT32 block; //블록번호
+	UINT32 offset;//섹터내 offset
 } EXT2_DIR_ENTRY_LOCATION;
 
 typedef struct
