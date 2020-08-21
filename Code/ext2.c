@@ -292,18 +292,35 @@ int create_root(DISK_OPERATIONS* disk, EXT2_SUPER_BLOCK * sb)
 	ip = (INODE *)sector;
 	ip++;
 	ip->mode = 0x1FF | 0x4000;
-	printf("create_root mode : %u\n", ip->mode);
 	ip->size = 0;
 	ip->blocks = 1;
 	ip->block[0] = sb->first_data_block_each_group;
-	ip->flags = 10;
+
+
+
 	disk->write_sector(disk, BOOT_SECTOR_BASE + 4, sector);
 
 	return EXT2_SUCCESS;
 }
 
-void process_meta_data_for_inode_used(EXT2_NODE * retEntry, UINT32 inode_num, int fileType)
+void process_meta_data_for_inode_used(EXT2_NODE * retEntry, UINT32 inode_num, int fileType) // insertentry에서 inode 생성 시
 {
+	/*
+	BYTE sector[MAX_SECTOR_SIZE];
+	UINT32 group_num=0;
+	if (inode_num > fs->sb.inode_per_group){
+		group_num++;
+	}
+	data_read(fs, group_num, fs->gd.start_block_of_inode_bitmap, sector);
+	UINT32 i = inode_num/8;
+	UINT32 j = inode_num%8;
+	BYTE* bit = &sector[i];
+	BYTE marker = 0x01 << j-1;
+	*bit = *bit | marker;
+	data_write(fs, group_num, fs->gd.start_block_of_inode_bitmap, sector);
+	//------- inode비트맵 수정
+	//------- 수퍼블록 수정
+	*/
 }
 
 int insert_entry(UINT32 inode_num, EXT2_NODE * retEntry, int fileType)
@@ -331,6 +348,8 @@ UINT32 get_available_data_block(EXT2_FILESYSTEM * fs)//, UINT32 inode_num) //ino
 						break;
 					}
 				if(bit & 0x01==0 && data_num >17){ //비트가 0이고 데이터 넘버가 17 초과이면	
+					sector[i] |= (0x01 << j-1); // 해당 비트 1로 변환 후
+					data_write(fs, group_num, fs->gd.start_block_of_block_bitmap, sector); //변환내용 write
 					return data_num+group_num*fs->sb.block_per_group+1; //data_read사용 할 경우 필요 없음
 						//실제 블록 번호 반환 <디스크를 섹터로 인덱싱 했을때의 해당 블록 번호>
 				}
@@ -345,7 +364,39 @@ UINT32 get_available_data_block(EXT2_FILESYSTEM * fs)//, UINT32 inode_num) //ino
 
 int process_meta_data_for_block_used(EXT2_FILESYSTEM * fs, UINT32 inode_num)
 {
+	BYTE sector[MAX_SECTOR_SIZE];
+	/*
+	UINT32 group_num=0;
+	if (inode_num > fs->sb.){
+		group_num++;
+	}
+	data_read(fs, group_num, fs->gd.start_block_of_inode_bitmap, sector);
+	UINT32 i = inode_num/8;
+	UINT32 j = inode_num%8;
+	BYTE* bit = &sector[i];
+	BYTE marker = 0x01 << j-1;
+	*bit = *bit | marker;
+	data_write(fs, group_num, fs->gd.start_block_of_inode_bitmap, sector);
+	*/
+	fs->sb.free_block_count--;
+	fs->gd.free_blocks_count--;
+	UINT32 gi;
+	EXT2_SUPER_BLOCK* sb_read = (EXT2_SUPER_BLOCK *)sector;
+	for (gi = 0; gi < NUMBER_OF_GROUPS; gi++)
+	{
+		fs->disk->read_sector(fs->disk, fs->sb.block_per_group * gi + 1, sector);
+		sb_read->free_block_count--;
+		fs->disk->write_sector(fs->disk, fs->sb.block_per_group * gi + 1, sector);
+	}
+	EXT2_GROUP_DESCRIPTOR* gd = (EXT2_GROUP_DESCRIPTOR *)sector;
+	fs->disk->read_sector(fs->disk, 1 + 1, sector);
+	gd->free_blocks_count--;
+	fs->disk->write_sector(fs->disk, 1 + 1, sector);
+	// fs내의 수퍼블록이랑 gd만 수정해주면 되는지 ? Or 디스크의 수퍼블록 영역 가서 리드 라이트 해줘야 하는지 ?
 	
+	
+	//------- inode비트맵 수정
+	//------- 수퍼블록 수정
 }
 
 int expand_indirect(EXT2_FILESYSTEM *fs, INODE *inodeBuffer, UINT32 inode_num, const unsigned int block_number)	// block_number: expand할 block_number -> indirect block을 expand 해야하는지 검사
@@ -679,7 +730,7 @@ int find_entry_on_data(EXT2_FILESYSTEM* fs, INODE first, const BYTE* formattedNa
 			{
 				memcpy( &ret->entry, &entry[number], sizeof( EXT2_DIR_ENTRY ) );
 				
-				ret->location.group	= first.gid;
+				ret->location.group	= first.gid; //수정
 				ret->location.block	= currentBlock;
 				ret->location.offset	= number;
 				
@@ -878,7 +929,6 @@ UINT32 get_free_inode_number(EXT2_FILESYSTEM* fs)
 	BYTE sector[MAX_SECTOR_SIZE];
 	UINT32 i;
 	UINT32 begin=0;  
-	UINT32 number_of_blocks_for_group = (fs->disk->numberOfSectors-1)/2;
 	UINT32 max_inode_num_for_group = fs->sb.inode_per_group;
 		//한 그룹당 아이노드 비트맵의 마지막 넘버
 		//데이터 영역 블록 수 = 그룹당 블록개수 - 데이터 영역 이전 블록개수 
@@ -911,7 +961,7 @@ UINT32 get_free_inode_number(EXT2_FILESYSTEM* fs)
 	} 
 	return EXT2_ERROR; 
 }
-
+// node 수정한거 실제 테이블에 저장
 int set_inode_onto_inode_table(EXT2_FILESYSTEM *fs, const UINT32 which_inode_num_to_write, INODE * inode_to_write)
 { 
 	BYTE sector[MAX_SECTOR_SIZE];
@@ -919,14 +969,17 @@ int set_inode_onto_inode_table(EXT2_FILESYSTEM *fs, const UINT32 which_inode_num
 	if (which_inode_num_to_write > fs->sb.inode_per_group){
 		group_num++;
 	}
+	INODE* inode_pointer;
 	data_read(fs, group_num, fs->gd.start_block_of_inode_bitmap, sector);
-	UINT32 i = which_inode_num_to_write/8;
-	UINT32 j = which_inode_num_to_write%8;
-	BYTE* bit = &sector[i];
-	BYTE marker = 0x01 << j-1;
-	*bit = *bit | marker;
+	inode_pointer = (INODE*)sector;
+	for(int i=0;i<which_inode_num_to_write;i++){
+		inode_pointer++;
+	}
+	inode_pointer=inode_to_write;
 	data_write(fs, group_num, fs->gd.start_block_of_inode_bitmap, sector);
-	return EXT2_SUCCESS;
+
+
+	
 }
 
 int ext2_lookup(EXT2_NODE* parent, const char* entryName, EXT2_NODE* retEntry)

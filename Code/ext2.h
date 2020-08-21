@@ -129,7 +129,7 @@ typedef struct
 typedef struct
 {
 	UINT32 group; //그룹번호
-	UINT32 block; //블록번호
+	UINT32 block; //블록번호 
 	UINT32 offset;//섹터내 offset
 } EXT2_DIR_ENTRY_LOCATION;
 
