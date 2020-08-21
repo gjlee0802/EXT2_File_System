@@ -406,7 +406,6 @@ UINT32 expand_block(EXT2_FILESYSTEM * fs, UINT32 inode_num)
 	get_inode(fs,inode_num,&inodeBuffer);
 	UINT32 i = 0;
 	while(inodeBuffer.block[i]>0 || i<14){
-		//printf(" %d ", inodeBuffer.block[i]);
 		i++;
 	}
 	SECTOR new_block;
@@ -702,7 +701,7 @@ int prepare_inode_table_block(EXT2_FILESYSTEM* fs, const UINT32 inode, BYTE* ino
 	get_inode_table_block(fs, inode, inodeTableSector, begin);
 }
 
-int* get_inode(EXT2_FILESYSTEM* fs, const UINT32 inode, INODE *inodeBuffer)
+int get_inode(EXT2_FILESYSTEM* fs, const UINT32 inode, INODE *inodeBuffer)
 {
 	BYTE sector[MAX_SECTOR_SIZE];
 	int i, begin;
@@ -730,8 +729,7 @@ int read_root_sector(EXT2_FILESYSTEM* fs, BYTE* sector)
 	SECTOR rootBlock;
 	get_inode(fs, inode, &inodeBuffer);
 	rootBlock = get_data_block_at_inode(fs, inodeBuffer, 1);
-	//return data_read(fs, 0, rootBlock, sector);
-	return fs->disk->read_sector(fs->disk, rootBlock, sector);
+	return data_read(fs, 0, rootBlock, sector);
 }
 int read_data_sector(EXT2_FILESYSTEM* fs, INODE first, UINT32 currentBlock, BYTE* sector)
 {	
