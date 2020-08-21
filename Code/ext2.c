@@ -308,14 +308,14 @@ int insert_entry(UINT32 inode_num, EXT2_NODE * retEntry, int fileType)
 {
 }
 
-UINT32 get_available_data_block(EXT2_FILESYSTEM * fs, UINT32 inode_num)
+UINT32 get_available_data_block(EXT2_FILESYSTEM * fs)//, UINT32 inode_num) //inode_num에 넣어줘야할듯 ????
 {
 	BYTE sector[MAX_SECTOR_SIZE];
 	UINT32 i;
 	UINT32 begin=0;  
 	UINT32 number_of_blocks_for_group = (fs->disk->numberOfSectors-1)/2;
 	UINT32 max_block_num_for_group = number_of_blocks_for_group; 
-	UINT32 last = (max_block_num_for_group+7) / 8;//(소숫점 생길 경우 올림연산위해 +7)
+	UINT32 last = (fs->sb.block_per_group+7) / 8;//(소숫점 생길 경우 올림연산위해 +7)
 	UINT32 group_num = 0;
 	while(group_num < NUMBER_OF_GROUPS){// 그룹 수 만큼 반복
 		data_read(fs, group_num, fs->gd.start_block_of_block_bitmap, sector);
@@ -325,11 +325,11 @@ UINT32 get_available_data_block(EXT2_FILESYSTEM * fs, UINT32 inode_num)
 			BYTE bit = sector[i];
 			while(j<9){
 				UINT32 data_num = 8*i+j;
-				if (data_num>max_block_num_for_group){ // 그룹당 데이터 최대 넘버 초과시 다음 그룹으로 이동
+				if (data_num>fs->sb.block_per_group){ // 그룹당 데이터 최대 넘버 초과시 다음 그룹으로 이동
 						break;
 					}
 				if(bit & 0x01==0 && data_num >17){ //비트가 0이고 데이터 넘버가 17 초과이면	
-					return data_num;//+group_num*number_of_blocks_for_group; data_read사용 할 경우 필요 없음
+					return data_num+group_num*fs->sb.block_per_group+1; //data_read사용 할 경우 필요 없음
 						//실제 블록 번호 반환 <디스크를 섹터로 인덱싱 했을때의 해당 블록 번호>
 				}
 				bit >>1;
@@ -348,6 +348,27 @@ void process_meta_data_for_block_used(EXT2_FILESYSTEM * fs, UINT32 inode_num)
 
 UINT32 expand_block(EXT2_FILESYSTEM * fs, UINT32 inode_num)
 {
+	INODE inodeBuffer;
+	get_inode(fs,inode_num,&inodeBuffer);
+	UINT32 i = 0;
+	while(inodeBuffer.block[i]>0 || i<14){
+		//printf(" %d ", inodeBuffer.block[i]);
+		i++;
+	}
+	SECTOR new_block;
+	new_block = get_available_data_block(fs);
+	if(i<12)
+		inodeBuffer.block[i] = new_block;
+	else if (i<13){// indirect
+		
+	}
+	else if (i<14){// double indirect
+
+	}
+	else if (i<15){// triple indirect
+
+	}
+
 }
 
 int meta_read(EXT2_FILESYSTEM * fs, SECTOR group, SECTOR block, BYTE* sector)
@@ -723,7 +744,7 @@ int ext2_read_superblock(EXT2_FILESYSTEM* fs, EXT2_NODE* root)
 UINT32 get_free_inode_number(EXT2_FILESYSTEM* fs)
 {
 	BYTE sector[MAX_SECTOR_SIZE];
-	UINT32 inodebitmap_block = 1+;
+	//UINT32 inodebitmap_block = 1+;
 	UINT32 i;
 	UINT32 begin=0;  
 	UINT32 number_of_blocks_for_group = (fs->disk->numberOfSectors-1)/2;
@@ -761,7 +782,20 @@ UINT32 get_free_inode_number(EXT2_FILESYSTEM* fs)
 }
 
 int set_inode_onto_inode_table(EXT2_FILESYSTEM *fs, const UINT32 which_inode_num_to_write, INODE * inode_to_write)
-{
+{ 
+	BYTE sector[MAX_SECTOR_SIZE];
+	UINT32 group_num=0;
+	if (which_inode_num_to_write > fs->sb.inode_per_group){
+		group_num++;
+	}
+	data_read(fs, group_num, fs->gd.start_block_of_inode_bitmap, sector);
+	UINT32 i = which_inode_num_to_write/8;
+	UINT32 j = which_inode_num_to_write%8;
+	BYTE* bit = &sector[i];
+	BYTE marker = 0x01 << j-1;
+	*bit = *bit | marker;
+	data_write(fs, group_num, fs->gd.start_block_of_inode_bitmap, sector);
+	return EXT2_SUCCESS;
 }
 
 int ext2_lookup(EXT2_NODE* parent, const char* entryName, EXT2_NODE* retEntry)
