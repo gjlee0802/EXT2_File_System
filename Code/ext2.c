@@ -365,6 +365,7 @@ UINT32 get_available_data_block(EXT2_FILESYSTEM * fs)//, UINT32 inode_num) //ino
 int process_meta_data_for_block_used(EXT2_FILESYSTEM * fs, UINT32 inode_num)
 {
 	BYTE sector[MAX_SECTOR_SIZE];
+	
 	/*
 	UINT32 group_num=0;
 	if (inode_num > fs->sb.){
@@ -395,7 +396,8 @@ int process_meta_data_for_block_used(EXT2_FILESYSTEM * fs, UINT32 inode_num)
 	// fs내의 수퍼블록이랑 gd만 수정해주면 되는지 ? Or 디스크의 수퍼블록 영역 가서 리드 라이트 해줘야 하는지 ?
 	
 	
-	//------- inode비트맵 수정
+	//------- data block 비트맵 수정
+	
 	//------- 수퍼블록 수정
 }
 
@@ -411,6 +413,7 @@ int expand_indirect(EXT2_FILESYSTEM *fs, INODE *inodeBuffer, UINT32 inode_num, c
 
 	if ( block_number == 13 )	// check if single indirect block is needed
 	{
+		// expand single indirect
 		new_block = get_available_data_block(fs);
 		inodeBuffer->block[12] = new_block;
 		if(process_meta_data_for_block_used(fs, inode_num) == EXT2_ERROR)	
@@ -442,6 +445,9 @@ int expand_indirect(EXT2_FILESYSTEM *fs, INODE *inodeBuffer, UINT32 inode_num, c
 			}
 			new_block = get_available_data_block(fs);
 			*block_pointer = new_block;
+			if(process_meta_data_for_block_used(fs, inode_num) == EXT2_ERROR)	
+				return EXT2_ERROR;
+			inodeBuffer->blocks++;
 		}
 	}
 	else if( block_number <= 12 + indirect_pointer_per_sector + 
@@ -460,8 +466,46 @@ int expand_indirect(EXT2_FILESYSTEM *fs, INODE *inodeBuffer, UINT32 inode_num, c
 			inodeBuffer->blocks++;
 		}
 		// expand second layer indirect block
-		/*Should fill here*/
+		if( index % (indirect_pointer_per_sector*indirect_pointer_per_sector) == 0)
+		{
+			fs->disk->read_sector(fs->disk, inodeBuffer->block[14], sector);	// read first layer indirect
+			block_pointer = (unsigned int *)sector;
+
+			for(int i=0; i < index / indirect_pointer_per_sector; i++)
+			{
+				block_pointer++;
+			}
+			new_block = get_available_data_block(fs);
+			*block_pointer = new_block;											// get new block for second layer indirect
+			if(process_meta_data_for_block_used(fs, inode_num) == EXT2_ERROR)	
+				return EXT2_ERROR;
+			inodeBuffer->blocks++;
+			
+		}
 		// expand third layer indirect block
+		if( index % indirect_pointer_per_sector == 0)
+		{
+			fs->disk->read_sector(fs->disk, inodeBuffer->block[14], sector);	// read first layer indirect
+			block_pointer = (unsigned int *)sector;
+
+			for(int i=0; i < index / indirect_pointer_per_sector; i++)
+			{
+				block_pointer++;
+			}
+			
+			fs->disk->read_sector(fs->disk, *block_pointer, sector);			// read second layer indirect
+			block_pointer = (unsigned int *)sector;
+
+			for(int i=0; i < index % (indirect_pointer_per_sector*indirect_pointer_per_sector); i++)
+			{
+				block_pointer++;
+			}
+			new_block = get_available_data_block(fs);
+			*block_pointer = new_block;											// get new block for third layer indirect
+			if(process_meta_data_for_block_used(fs, inode_num) == EXT2_ERROR)	
+				return EXT2_ERROR;
+			inodeBuffer->blocks++;
+		}
 	}	
 }
 
@@ -977,9 +1021,6 @@ int set_inode_onto_inode_table(EXT2_FILESYSTEM *fs, const UINT32 which_inode_num
 	}
 	inode_pointer=inode_to_write;
 	data_write(fs, group_num, fs->gd.start_block_of_inode_bitmap, sector);
-
-
-	
 }
 
 int ext2_lookup(EXT2_NODE* parent, const char* entryName, EXT2_NODE* retEntry)
