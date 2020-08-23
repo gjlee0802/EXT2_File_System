@@ -616,10 +616,10 @@ int find_entry_on_root(EXT2_FILESYSTEM* fs, INODE inode, char* formattedName, EX
 				// formattedName으로 검색하여 찾은 FAT_DIR_ENTRY를 ret->entry에 write
 
 				ret->location.group	= 0;
-				// cluster위치 고정
+				// group위치 고정
 
 				ret->location.block	= 0;
-				// sector의 실제 위치
+				// block 위치
 
 				ret->location.offset = number;
 				// sector내부에서의 실제 인덱스
@@ -663,11 +663,10 @@ int find_entry_on_data(EXT2_FILESYSTEM* fs, INODE first, const BYTE* formattedNa
 			else //찾
 			{
 				memcpy( &ret->entry, &entry[number], sizeof( EXT2_DIR_ENTRY ) );
-				
-				ret->location.group	= first.gid; //수정
-				ret->location.block	= currentBlock;
+				SECTOR data_block = get_data_block_at_inode(fs, first, currentBlock);
+				ret->location.group	= (data_block-1) / fs->sb.block_per_group;
+				ret->location.block	= (data_block-1) % fs->sb.block_per_group;
 				ret->location.offset	= number;
-				
 				ret->fs = fs;
 				//찾은 정보 ret에 복사
 			}
