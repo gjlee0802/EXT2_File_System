@@ -173,7 +173,7 @@ int fs_mount(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, SHELL_ENTRY* ro
 		printf("\n----------------------------------------------\n");
 	}
 
-	printf("%s", ext2_entry.entry.name);
+	printf("VOLUME_LABEL : %s\n", ext2_entry.entry.name);
 	ext2_entry_to_shell_entry(fs, &ext2_entry, root); //&ext2_entry를 root에 먹임
 
 	return result;
@@ -226,7 +226,10 @@ int	fs_create(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_EN
 	shell_entry_to_ext2_entry(parent, &EXT2Parent);
 
 	result = ext2_create(&EXT2Parent, name, &EXT2Entry);
-
+	PRINTF("----Created Entry----\n");
+	PRINTF("Entry inode: %u \n", EXT2Entry.entry.inode);
+	PRINTF("Entry name : %s \n", EXT2Entry.entry.name);
+	PRINTF("---------------------\n");
 	ext2_entry_to_shell_entry(EXT2Parent.fs, &EXT2Entry, retEntry);
 
 	return result;
