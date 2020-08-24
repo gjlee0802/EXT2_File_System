@@ -15,7 +15,7 @@
 #define		NUMBER_OF_SECTORS		( 4096 + 1 )
 #define		NUMBER_OF_GROUPS		2
 #define		NUMBER_OF_INODES		200
-#define		VOLUME_LABLE			"EXT2 BY NC"
+#define		VOLUME_LABLE	"EXT2 BY NC"
 
 #define MAX_SECTOR_SIZE			1024
 #define MAX_BLOCK_SIZE			1024
@@ -164,6 +164,7 @@ int ext2_lookup(EXT2_NODE* parent, const char* entryName, EXT2_NODE* retEntry);
 
 int expand_indirect(EXT2_FILESYSTEM *fs, INODE *inodeBuffer, UINT32 inode_num, const unsigned int block_number);
 int expand_block(EXT2_FILESYSTEM * , UINT32 );
+int expand_inode(EXT2_FILESYSTEM* fs, UINT32* inum);
 int fill_super_block(EXT2_SUPER_BLOCK * sb, SECTOR numberOfSectors, UINT32 bytesPerSector);
 int fill_descriptor_block(EXT2_GROUP_DESCRIPTOR * gd, EXT2_SUPER_BLOCK * sb, SECTOR numberOfSectors, UINT32 bytesPerSector);
 int create_root(DISK_OPERATIONS* disk, EXT2_SUPER_BLOCK * sb);

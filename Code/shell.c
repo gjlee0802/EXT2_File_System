@@ -119,7 +119,7 @@ void do_shell(void)
 
 	while (-1)
 	{
-		printf("�й� : [/%s]# ", g_currentDir.name);
+		printf("NCLAB21 : [/%s]# ", g_currentDir.name);
 
 		fgets(buf, 1000, stdin);
 		argc = seperate_string(buf, argv);
