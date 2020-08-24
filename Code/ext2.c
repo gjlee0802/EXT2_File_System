@@ -337,9 +337,9 @@ int set_entry(EXT2_FILESYSTEM* fs, const EXT2_DIR_ENTRY_LOCATION* location, cons
 	}
 	else
 	{
-		//뭘 해야 되냐면 루트 그룹 외 그릅에 접근 하여 그릅의 섹터 내용을 섹터 버퍼에 저장
+		// 루트 그룹 외 그릅에 접근 하여 그릅의 섹터 내용을 섹터 버퍼에 저장
 		data_read(fs, location->group, location->block, sector);
-		entry = (EXT2_DIR_ENTRY*)sector;   // 섹터 버퍼를 디릭토리 엔트르르써 접근할 수 있도록 type casting
+		entry = (EXT2_DIR_ENTRY*)sector;
 		entry[location->offset] = *value;
 		data_write(fs, location->group, location->block, sector);
 	}
@@ -362,7 +362,7 @@ int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, BYTE overwrite)
 		printf("error");
 		return EXT2_ERROR;
 	}
-	// inode에 해당하는 데에터 블록 반환 , inode에 속한 첫번째 데에터 블록 가자옴
+	// inode에 해당하는 데에터 블록 반환 , inode에 속한 첫번째 데에터 블록 가져옴
 	result = get_data_block_at_inode(parent->fs, inodeBuffer, 1);  // 1번째 데이터 블록의 번호 가져옴
 	if(result != EXT2_SUCCESS)
 	{
@@ -370,8 +370,8 @@ int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, BYTE overwrite)
 		return EXT2_ERROR;
 	}
 
-	begin.group = (result - 1) / sb.block_per_group;    // 몇번째 그릅인지
-	begin.block = (result - 1) % sb.block_per_group;   // 데이터 블록 영역에서 몇번째 블록인지 나옴 (근데 이맇게 하면 데에터 블록 영역 앞 블록 개수를 모르잖아 data_read코드 보면 그룹 내 블록 개수를 알아야 real_index가 말이 됨)
+	begin.group = (result - 1) / sb.block_per_group;
+	begin.block = (result - 1) % sb.block_per_group;
 	begin.offset = 0;   // 데에터 블록 내 엔트리 위치
 	/*
 	if( set_entry(parent->fs, &begin, &retEntry->entry) != EXT2_SUCCESS )
@@ -423,7 +423,7 @@ int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, BYTE overwrite)
 			if(get_inode(parent->fs, parent->entry.inode, &inodeBuffer) != EXT2_SUCCESS)
 				return EXT2_ERROR;
 			
-			result = get_data_block_at_inode(parent->fs, inodeBuffer, inodeBuffer.bloks);
+			result = get_data_block_at_inode(parent->fs, inodeBuffer, inodeBuffer.blocks);
 			entryNoMore.location.group = (result - 1) / sb.block_per_group;
 			entryNoMore.location.block = (result - 1) % sb.block_per_group;
 			entryNoMore.location.offset = 0; 
@@ -913,7 +913,7 @@ int get_inode_table_block(EXT2_FILESYSTEM* fs, const UINT32 inode, BYTE* inodeTa
 
 int prepare_inode_table_block(EXT2_FILESYSTEM* fs, const UINT32 inode, BYTE* inodeTableSector, int* begin)// 예외처리 필요
 {
-	get_inode_table_block(fs, inode, inodeTableSector, begin);
+	return get_inode_table_block(fs, inode, inodeTableSector, begin);
 }
 
 int get_inode(EXT2_FILESYSTEM* fs, const UINT32 inode, INODE *inodeBuffer)
@@ -925,7 +925,11 @@ int get_inode(EXT2_FILESYSTEM* fs, const UINT32 inode, INODE *inodeBuffer)
 
 	ZeroMemory(sector, sizeof(sector));
 
-	prepare_inode_table_block(fs, inode, sector, &begin);
+	if( prepare_inode_table_block(fs, inode, sector, &begin) == -1)
+	{
+		PRINTF("ERROR: Cannot read inode table\n");
+		return EXT2_ERROR;
+	}
 	printf("inode : %d\nbegin : %d\n", inode, begin);
 	inode_ptr = (INODE *)sector;	// begin block of the inode Table
 	
@@ -934,6 +938,8 @@ int get_inode(EXT2_FILESYSTEM* fs, const UINT32 inode, INODE *inodeBuffer)
 		inode_ptr++;
 	}
 	*inodeBuffer = *inode_ptr;
+
+	return EXT2_SUCCESS;
 }
 
 // root 섹터 메타데이터 정해뒀음
@@ -982,7 +988,7 @@ int ext2_create(EXT2_NODE* parent, char* entryName, EXT2_NODE* retEntry)
 	if ((result = lookup_entry(parent->fs, inode, name, retEntry)) == EXT2_SUCCESS) return EXT2_ERROR;
 	else if (result == -2) return EXT2_ERROR;
 
-	if (insert_entry(inode, retEntry, 0) == EXT2_ERROR)return EXT2_ERROR;
+	if (insert_entry(parent, retEntry, 0) == EXT2_ERROR) return EXT2_ERROR;
 	return EXT2_SUCCESS;
 }
 
