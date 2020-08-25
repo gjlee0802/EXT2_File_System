@@ -39,7 +39,7 @@ int ext2_write(EXT2_NODE* file, unsigned long offset, unsigned long length, cons
 	{
 		DWORD	copyLength;
 
-		blockNumber = currentOffset / MAX_BLOCK_SIZE;
+		blockNumber = currentOffset / blockSize;
 		if (currentBlock == 0)
 		{
 			if (expand_block(file->fs, file->entry.inode) == EXT2_ERROR)
@@ -87,12 +87,12 @@ int ext2_write(EXT2_NODE* file, unsigned long offset, unsigned long length, cons
 			buffer,
 			copyLength);
 
-		//if (data_write(file->fs, 0, currentBlock, sector))
 		file->fs->disk->write_sector(file->fs->disk, currentBlock, sector);
-			break;
+			
 
 		buffer += copyLength;
 		currentOffset += copyLength;
+
 	}
 	//node.size = MAX(currentOffset, node.size);
 	node.size = MAX(currentOffset, length);
@@ -330,6 +330,7 @@ void process_meta_data_for_inode_used(EXT2_NODE * retEntry, int fileType) // ins
 	inode_buf.block[0]=0;
     inode_buf.blocks=0;
     inode_buf.size = 0;
+	printf("overwrite: %u\n",fileType);
 	if (fileType==FILE_TYPE_DIR){
 		inode_buf.mode = 0x1FF | FILE_TYPE_DIR;
 	}
@@ -368,20 +369,23 @@ int set_entry(EXT2_FILESYSTEM* fs, const EXT2_DIR_ENTRY_LOCATION* location, cons
 }
 
 
-int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, BYTE overwrite)
+int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, int overwrite)
 {
-	PRINTF("[Enter]: insert_entry\n");
+	PRINTF("[Enter]: !insert_entry\n");
+	printf("overwrite_insert_entry : %u\n",overwrite);
 	EXT2_DIR_ENTRY_LOCATION begin;
+	
 	INODE                  inodeBuffer;
 	EXT2_SUPER_BLOCK        sb = parent->fs->sb;
 	EXT2_NODE               entryNoMore;
 	//BYTE                    buffer[MAX_BLOCK_SIZE];
 	BYTE                    entryName[2] = { 0, };
 	UINT32                  result;
-
+	
 	if ( get_inode( parent->fs, parent->entry.inode, &inodeBuffer ) != EXT2_SUCCESS){
 		return EXT2_ERROR;
 	}
+	
 	// inode에 해당하는 데이터 블록 반환 , inode에 속한 첫번째 데에터 블록 가져옴
 	result = get_data_block_at_inode(parent->fs, inodeBuffer, 1);  // 1번째 데이터 블록의 번호 가져옴
 
@@ -390,8 +394,9 @@ int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, BYTE overwrite)
 	begin.block = parent->location.block;
 	begin.offset = parent->location.offset;
 	
-	if(overwrite)
+	if(overwrite==1)
 	{
+		PRINTF("f1\n");
 		begin.offset = 0;
 		process_meta_data_for_inode_used(retEntry,overwrite);
 		set_entry(parent->fs, &begin, &retEntry->entry);
@@ -417,6 +422,7 @@ int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, BYTE overwrite)
 	else	// 빈 엔트리 못 찾았을 경우
 	{
 		printf("(2)\n");
+		PRINTF("f2\n");
 		entryName[0] = DIR_ENTRY_NO_MORE;
 		if( lookup_entry(parent->fs, parent->entry.inode, entryName, &entryNoMore) == EXT2_ERROR)
 			return EXT2_ERROR;
@@ -816,8 +822,6 @@ int lookup_entry(EXT2_FILESYSTEM* fs, const int inode, const char* name, EXT2_NO
 	{
 		return find_entry_on_data(fs,inodeBuffer,name,retEntry); //그 외 데이터에서 entry찾기
 	}
-	
-
 }
 
 int find_entry_at_sector(const BYTE* sector, const BYTE* formattedName, UINT32 begin, UINT32 last, UINT32* number)
@@ -1342,6 +1346,7 @@ char* my_strncpy(char* dest, const char* src, int length)
 
 int ext2_mkdir(const EXT2_NODE* parent, const char* entryName, EXT2_NODE* retEntry)
 {
+	printf("[Enter]: ext2_mkdir\n");
 	EXT2_NODE      dotNode, dotdotNode;
 	DWORD         firstCluster;
 	BYTE         name[MAX_NAME_LENGTH];
@@ -1357,28 +1362,27 @@ int ext2_mkdir(const EXT2_NODE* parent, const char* entryName, EXT2_NODE* retEnt
 	memcpy(retEntry->entry.name, name, MAX_ENTRY_NAME_LENGTH);
 	retEntry->entry.name_len = strlen((char*)retEntry->entry.name);
 	retEntry->fs = parent->fs;
-
-	result = insert_entry(parent->entry.inode, retEntry, FILE_TYPE_DIR);
+	result = insert_entry(parent, retEntry, FILE_TYPE_DIR);
 	if (result == EXT2_ERROR)
 		return EXT2_ERROR;
 
 	expand_block(parent->fs, retEntry->entry.inode);
-
+	
 	ZeroMemory(&dotNode, sizeof(EXT2_NODE));
 	memset(dotNode.entry.name, 0x20, 11);
 	dotNode.entry.name[0] = '.';
 	dotNode.fs = retEntry->fs;
 	dotNode.entry.inode = retEntry->entry.inode;
-	insert_entry(retEntry->entry.inode, &dotNode, FILE_TYPE_DIR);
-
+	insert_entry(retEntry, &dotNode, FILE_TYPE_DIR);
+	
 	ZeroMemory(&dotdotNode, sizeof(EXT2_NODE));
 	memset(dotdotNode.entry.name, 0x20, 11);
 	dotdotNode.entry.name[0] = '.';
 	dotdotNode.entry.name[1] = '.';
 	dotdotNode.entry.inode = parent->entry.inode;
 	dotdotNode.fs = retEntry->fs;
-	insert_entry(retEntry->entry.inode, &dotdotNode, FILE_TYPE_DIR);
-
+	insert_entry(retEntry, &dotdotNode, FILE_TYPE_DIR);
+	
 	return EXT2_SUCCESS;
 }
 
@@ -1436,4 +1440,8 @@ int is_type(EXT2_NODE* node, UINT32 type){
 		return 1;
 	}
 	else return 0;
+}
+
+int free_databit(){
+	;
 }
