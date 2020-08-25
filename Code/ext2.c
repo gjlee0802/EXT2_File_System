@@ -667,7 +667,7 @@ int expand_block(EXT2_FILESYSTEM * fs, UINT32 inode_num)	// indirect가 필요�
 		{
 			fs->disk->read_sector(fs->disk, inodeBuffer.block[12], sector);	
 			block_pointer = (unsigned int *)sector;
-			block_pointer[block_number_at_inode - 1] = new_block;			// give new_block
+			block_pointer[block_number_at_inode - 13] = new_block;			// give new_block
 			fs->disk->write_sector(fs->disk, inodeBuffer.block[12], sector);
 		}
 		else if ( block_number_at_inode <= 12 + indirect_pointer_per_sector + indirect_pointer_per_sector * indirect_pointer_per_sector )	// double indirect block
