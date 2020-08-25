@@ -1442,6 +1442,18 @@ int is_type(EXT2_NODE* node, UINT32 type){
 	else return 0;
 }
 
-int free_databit(EXT2_FILESYSTEM* fs,, int bitnum){
-	;
+void free_databit(EXT2_FILESYSTEM* fs, int bitnum){
+	BYTE sector[MAX_SECTOR_SIZE];
+	UINT32 i,j;
+	UINT32 begin=0; 
+	UINT32 group_num = 0;
+	if (bitnum>fs->sb.block_per_group){
+		group_num++;
+	}
+	data_read(fs, group_num, fs->gd.start_block_of_block_bitmap, sector);
+	i = (bitnum+7) / 8;
+	j = bitnum % 8;
+	sector[i] ^= (0x01 << j-1); // 해당 비트 0으로 변환 후
+	data_write(fs, group_num, fs->gd.start_block_of_block_bitmap, sector); //변환내용 write
+	
 }
