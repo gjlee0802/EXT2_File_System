@@ -121,7 +121,6 @@ void do_shell(void)
 	int i, j = 0;
 
 	printf("%s File system shell\n", g_fs.name);
-
 	while (-1)
 	{
 		printf("NCLAB21 : [/%s]# ", g_currentDir.name);
