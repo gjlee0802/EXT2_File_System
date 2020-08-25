@@ -339,7 +339,11 @@ int set_entry(EXT2_FILESYSTEM* fs, const EXT2_DIR_ENTRY_LOCATION* location, cons
 		printf("FLAG1\n");
 		read_root_sector(fs, sector);   // 루트 섹터의 내용을 섹터 버퍼에 저장
 		entry = (EXT2_DIR_ENTRY*)sector;   // 섹터 버퍼를 디릭토리 엔트리로써 접근할 수 있도록 type casting
-		entry[location->offset] = *value;   // 섹터 버퍼 내 엔트리 위치에 newEntry->entry의 값을 set
+		//PRINTF("test : %u\n", location->offset);
+		//entry[location->offset] = *value;   // 섹터 버퍼 내 엔트리 위치에 newEntry->entry의 값을 set
+		for(int i=0; i<location->offset; i++)
+			entry++;
+		*entry = *value;
 		write_root_sector(fs, sector);
 	}
 	else
@@ -422,6 +426,8 @@ int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, BYTE overwrite)
 		if( lookup_entry(parent->fs, parent->entry.inode, entryName, &entryNoMore) == EXT2_ERROR)
 			return EXT2_ERROR;
 		expand_inode(parent->fs, &retEntry->entry.inode);
+		//PRINTF("location.block : %u\n", entryNoMore.location.block);
+		//PRINTF("location.offset : %u\n", entryNoMore.location.offset);
 		set_entry(parent->fs, &entryNoMore.location, &retEntry->entry);
 		retEntry->location = entryNoMore.location;
 
@@ -854,7 +860,6 @@ int lookup_entry(EXT2_FILESYSTEM* fs, const int inode, const char* name, EXT2_NO
 	{
 		return find_entry_on_data(fs,inodeBuffer,name,retEntry); //그 외 데이터에서 entry찾기
 	}
-	
 
 }
 
@@ -1317,8 +1322,6 @@ int ext2_read_dir(EXT2_NODE* dir, EXT2_NODE_ADD adder, void* list)
 		//data_read(dir->fs, 0, num, sector);
 		dir->fs->disk->read_sector(dir->fs->disk, num, sector);
 
-		EXT2_DIR_ENTRY *tmp;
-		tmp = (EXT2_DIR_ENTRY *)sector;
 		if (dir->entry.inode == 2)
 			// 32 == sizeof(EXT2_DIR_ENTRY), 즉 &sector[0]에 있는 root엔트리를 제외함.
 			read_dir_from_sector(dir->fs, sector + 32, adder, list);

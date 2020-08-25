@@ -213,10 +213,10 @@ int fs_write(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENT
 	INODE inode;
 	get_inode(EXT2Entry.fs, 11, &inode);
 	PRINTF("getsize : %u\n", inode.size);
-	ext2_entry_to_shell_entry(EXT2Entry.fs, &EXT2Entry, entry);
-	PRINTF("SHELLENTRY name : %s\n", entry->name);
-	PRINTF("SHELLENTRY size : %u\n", entry->size);
-	PRINTF("SHELLENTRY isDir : %d\n", entry->isDirectory);
+	//ext2_entry_to_shell_entry(EXT2Entry.fs, &EXT2Entry, entry);
+	//PRINTF("SHELLENTRY name : %s\n", entry->name);
+	//PRINTF("SHELLENTRY size : %u\n", entry->size);
+	//PRINTF("SHELLENTRY isDir : %d\n", entry->isDirectory);
 	return ret;
 }
 
