@@ -306,7 +306,7 @@ int create_root(DISK_OPERATIONS* disk, EXT2_SUPER_BLOCK * sb)
 	return EXT2_SUCCESS;
 }
 
-void process_meta_data_for_inode_used(EXT2_NODE * retEntry, UINT32 inode_num, int fileType) // insertentry에서 inode 생성 시
+void process_meta_data_for_inode_used(EXT2_NODE * retEntry, int fileType) // insertentry에서 inode 생성 시
 {
     BYTE sector[MAX_SECTOR_SIZE];
     retEntry->fs->sb.free_inode_count--;
@@ -323,6 +323,21 @@ void process_meta_data_for_inode_used(EXT2_NODE * retEntry, UINT32 inode_num, in
     retEntry->fs->disk->read_sector(retEntry->fs->disk, 1 + 1, sector);
     gd->free_inodes_count--;
     retEntry->fs->disk->write_sector(retEntry->fs->disk, 1 + 1, sector);
+	//-------------------------------------------------------------------------수퍼블록,디스크립터 수정 후
+	INODE inode_buf;
+	retEntry->entry.inode = get_free_inode_number(retEntry->fs);
+	get_inode(retEntry->fs,retEntry->entry.inode,&inode_buf);
+	inode_buf.block[0]=0;
+    inode_buf.blocks=0;
+    inode_buf.size = 0;
+	if (fileType==FILE_TYPE_DIR){
+		inode_buf.mode = 0x1FF | FILE_TYPE_DIR;
+	}
+	else{
+		inode_buf.mode = 0x1FF | FILE_TYPE_FILE;
+	}
+	set_inode_onto_inode_table(retEntry->fs, retEntry->entry.inode, &inode_buf);
+	//--------------------------------------------------------------------------아이노드 할당 및 초기화
 }
 
 int set_entry(EXT2_FILESYSTEM* fs, const EXT2_DIR_ENTRY_LOCATION* location, const EXT2_DIR_ENTRY* value)
@@ -352,21 +367,6 @@ int set_entry(EXT2_FILESYSTEM* fs, const EXT2_DIR_ENTRY_LOCATION* location, cons
 	return EXT2_ERROR;
 }
 
-int expand_inode(EXT2_FILESYSTEM* fs, UINT32* inum)
-{
-    int new_i_num = get_free_inode_number(fs);
-	printf("get free inode : %u\n", new_i_num);
-    INODE inode;
-    if(get_inode(fs, new_i_num, &inode) != EXT2_SUCCESS)
-        return EXT2_ERROR;
-    *inum = new_i_num;
-    inode.block[0]=0;
-    inode.blocks=0;
-    inode.mode= 0x1FF | 0x4000;
-    inode.size = 0;
-    set_inode_onto_inode_table(fs, new_i_num, &inode);
-    return EXT2_SUCCESS;
-}
 
 int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, BYTE overwrite)
 {
@@ -393,7 +393,7 @@ int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, BYTE overwrite)
 	if(overwrite)
 	{
 		begin.offset = 0;
-		expand_inode(parent->fs, &retEntry->entry.inode);
+		process_meta_data_for_inode_used(retEntry,overwrite);
 		set_entry(parent->fs, &begin, &retEntry->entry);
 		retEntry->location = begin;
 		begin.offset = 1;
@@ -409,7 +409,8 @@ int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, BYTE overwrite)
 	if( lookup_entry(parent->fs, parent->entry.inode, entryName, &entryNoMore) == EXT2_SUCCESS)
 	{
 		printf("(1)\n");
-		expand_inode(parent->fs, &retEntry->entry.inode);
+		//expand_inode(parent->fs, &retEntry->entry.inode);
+		process_meta_data_for_inode_used(retEntry,overwrite);
 		set_entry(parent->fs, &entryNoMore.location, &retEntry->entry);
 		retEntry->location = entryNoMore.location;
 	}
@@ -419,7 +420,8 @@ int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, BYTE overwrite)
 		entryName[0] = DIR_ENTRY_NO_MORE;
 		if( lookup_entry(parent->fs, parent->entry.inode, entryName, &entryNoMore) == EXT2_ERROR)
 			return EXT2_ERROR;
-		expand_inode(parent->fs, &retEntry->entry.inode);
+		//expand_inode(parent->fs, &retEntry->entry.inode);
+		process_meta_data_for_inode_used(retEntry,overwrite);
 		set_entry(parent->fs, &entryNoMore.location, &retEntry->entry);
 		retEntry->location = entryNoMore.location;
 
@@ -1283,11 +1285,11 @@ int set_inode_onto_inode_table(EXT2_FILESYSTEM *fs, const UINT32 which_inode_num
 	Offset = (which_inode_num_to_write-1) / inode_per_sector;
 
 	sector_Offset = (which_inode_num_to_write-1) % inode_per_sector;
-		fs->disk->read_sector(fs->disk, sector_num_per_group * group_number + BOOT_SECTOR_BASE + fs->gd.start_block_of_inode_table + Offset, sector);
-		inode_pointer = (INODE *)sector;
-		memcpy(&inode_pointer[sector_Offset], inode_to_write, sizeof(INODE));
-		printf("----> %u", inode_to_write->size);
-		printf("==> %u\n", inode_pointer[sector_Offset].size);
+	fs->disk->read_sector(fs->disk, sector_num_per_group * group_number + BOOT_SECTOR_BASE + fs->gd.start_block_of_inode_table + Offset, sector);
+	inode_pointer = (INODE *)sector;
+	memcpy(&inode_pointer[sector_Offset], inode_to_write, sizeof(INODE));
+	printf("----> %u", inode_to_write->size);
+	printf("==> %u\n", inode_pointer[sector_Offset].size);
 		
 	fs->disk->write_sector(fs->disk, sector_num_per_group * group_number + BOOT_SECTOR_BASE + fs->gd.start_block_of_inode_table + Offset, sector);
 	
