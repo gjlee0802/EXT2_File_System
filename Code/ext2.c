@@ -1442,6 +1442,6 @@ int is_type(EXT2_NODE* node, UINT32 type){
 	else return 0;
 }
 
-int free_databit(){
+int free_databit(EXT2_FILESYSTEM* fs,, int bitnum){
 	;
 }
