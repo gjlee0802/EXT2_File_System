@@ -404,7 +404,7 @@ int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, BYTE overwrite)
 	
 	entryName[0] = DIR_ENTRY_FREE;       //  빈 entry 찾아아됨.
 	
-	if( lookup_entry(parent->fs, parent->entry.inode, entryName, &entryNoMore) == EXT2_SUCCESS)
+	if( lookup_entry(parent->fs, &begin, parent->entry.inode, entryName, &entryNoMore) == EXT2_SUCCESS)
 	{
 		printf("(1)\n");
 		expand_inode(parent->fs, &retEntry->entry.inode);
@@ -415,7 +415,7 @@ int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, BYTE overwrite)
 	{
 		printf("(2)\n");
 		entryName[0] = DIR_ENTRY_NO_MORE;
-		if( lookup_entry(parent->fs, parent->entry.inode, entryName, &entryNoMore) == EXT2_ERROR)
+		if( lookup_entry(parent->fs, &begin, parent->entry.inode, entryName, &entryNoMore) == EXT2_ERROR)
 			return EXT2_ERROR;
 		expand_inode(parent->fs, &retEntry->entry.inode);
 		set_entry(parent->fs, &entryNoMore.location, &retEntry->entry);
@@ -751,18 +751,17 @@ int format_name(EXT2_FILESYSTEM* fs, char* name)
 	return EXT2_SUCCESS;
 }
 //inode= parent's inodenum
-int lookup_entry(EXT2_FILESYSTEM* fs, const int inode, const char* name, EXT2_NODE* retEntry)
+int lookup_entry(EXT2_FILESYSTEM* fs, EXT2_DIR_ENTRY_LOCATION* begin, const int inode, const char* name, EXT2_NODE* retEntry)
 {
 	INODE inodeBuffer;
 	get_inode(fs, inode, &inodeBuffer);
 	if(inode==2)
-		return find_entry_on_root(fs,inodeBuffer,name,retEntry); //root에서 entry찾기
+		return find_entry_on_root(fs, begin, inodeBuffer,name,retEntry); //root에서 entry찾기
 	else
 	{
-		return find_entry_on_data(fs,inodeBuffer,name,retEntry); //그 외 데이터에서 entry찾기
+		return find_entry_on_data(fs, begin, inodeBuffer,name,retEntry); //그 외 데이터에서 entry찾기
 	}
 	
-
 }
 
 int find_entry_at_sector(const BYTE* sector, const BYTE* formattedName, UINT32 begin, UINT32 last, UINT32* number)
@@ -819,12 +818,12 @@ int find_entry_at_sector(const BYTE* sector, const BYTE* formattedName, UINT32 b
  *		fs->disk->read_sector(fs->disk, get_data_block_at_inode(fs, inode, i), sector);
  * 와 같이 반복문을 돌며 다음 data block로 넘어가서 entry를 검사할 수 있도록 해야함.
  */
-int find_entry_on_root(EXT2_FILESYSTEM* fs, INODE inode, char* formattedName, EXT2_NODE* ret)
+int find_entry_on_root(EXT2_FILESYSTEM* fs, EXT2_DIR_ENTRY_LOCATION* first, INODE inode, char* formattedName, EXT2_NODE* ret)
 {
 	BYTE	sector[MAX_SECTOR_SIZE];
 	UINT32	i, number;
 	UINT32	entriesPerSector, lastEntry;
-	INT32	begin = 0;
+	INT32	begin = first->offset;
 	INT32	result;
 	EXT2_DIR_ENTRY* entry;
 	
@@ -877,12 +876,12 @@ int find_entry_on_root(EXT2_FILESYSTEM* fs, INODE inode, char* formattedName, EX
  * 와 같이 반복문을 돌며 inode의 다음 data block로 넘어가서 entry를 검사할 수 있도록 함.
  * 수정후 -> read_data_sector를 안쓰면 get_data_block 호출 2번 -> 1번으로 호출 횟수가 줄어듦
  */
-int find_entry_on_data(EXT2_FILESYSTEM* fs, INODE inode, const BYTE* formattedName, EXT2_NODE* ret)
+int find_entry_on_data(EXT2_FILESYSTEM* fs, EXT2_DIR_ENTRY_LOCATION* first, INODE inode, const BYTE* formattedName, EXT2_NODE* ret)
 {
 	BYTE	sector[MAX_SECTOR_SIZE];
 	UINT32	i, number;
 	UINT32	entriesPerSector, lastEntry;
-	INT32	begin = 0;
+	INT32	begin = first->offset;
 	INT32	result;
 	SECTOR  data_block;
 	EXT2_DIR_ENTRY* entry;
@@ -1015,7 +1014,7 @@ int ext2_create(EXT2_NODE* parent, char* entryName, EXT2_NODE* retEntry)
 	memcpy(retEntry->entry.name, name, MAX_ENTRY_NAME_LENGTH);
 	retEntry->fs = parent->fs;
 	inode = parent->entry.inode;
-	if ((result = lookup_entry(parent->fs, inode, name, retEntry)) == EXT2_SUCCESS) return EXT2_ERROR;
+	if ((result = lookup_entry(parent->fs, parent->location, name, retEntry)) == EXT2_SUCCESS) return EXT2_ERROR;
 	else if (result == -2) return EXT2_ERROR;
 
 	if (insert_entry(parent, retEntry, 0) == EXT2_ERROR) return EXT2_ERROR;
@@ -1190,7 +1189,7 @@ int ext2_lookup(EXT2_NODE* parent, const char* entryName, EXT2_NODE* retEntry)
 	if (format_name(parent->fs, formattedName))
 		return EXT2_ERROR;
 
-	return lookup_entry(parent->fs, parent->entry.inode, formattedName, retEntry);
+	return lookup_entry(parent->fs, parent->location, parent->entry.inode, formattedName, retEntry);
 }
 
 int ext2_read_dir(EXT2_NODE* dir, EXT2_NODE_ADD adder, void* list)
@@ -1303,4 +1302,62 @@ int ext2_mkdir(const EXT2_NODE* parent, const char* entryName, EXT2_NODE* retEnt
 	insert_entry(retEntry->entry.inode, &dotdotNode, FILE_TYPE_DIR);
 
 	return EXT2_SUCCESS;
+}
+
+int ext2_remove(EXT2_NODE* file)
+{
+	INODE                inodeBuffer;
+	get_inode(file->fs, file->entry.inode, &inodeBuffer);
+	
+	if(inodeBuffer->mode & ATTR_DIRECTORY)
+		return EXT2_ERROR;
+	
+	file->entry.name[0] = DIR_ENTRY_FREE;
+	set_entry(file->fs, &file->location, &file->entry);
+	
+	// 해당 inode bitmap 0으로 바꾸는 함수 삽입.
+
+	return EXT2_SUCCESS;
+}
+
+int has_sub_entries(EXT2_NODE* file)
+{
+	EXT2_NODE                  subEntry;
+	EXT2_DIR_ENTRY_LOCATION    begin;
+
+	begin = file->location;
+	begin.offset = 2;
+
+	if(!lookup_entry(file->fs, &begin, file->entry.inode, NULL, &subEntry))
+		return EXT2_ERROR;
+
+	return EXT2_SUCCESS;
+}
+
+int ext2_rmdir(EXT2_NODE* file)
+{
+	INODE                inodeBuffer;
+	get_inode(file->fs, file->entry.inode, &inodeBuffer);
+
+	if(has_sub_entries(file))  
+		return EXT2_ERROR;
+	
+	if(!(is_dir(file) == ATTR_DIRECTORY))
+		return EXT2_ERROR;
+	
+	file->entry.name[0] = DIR_ENTRY_FREE;
+	set_entry(file->fs, &file->location, &file->entry);
+	// 해당 inode bitmap 0으로 바꾸는 함수 삽입
+	return EXT2_SUCCESS;
+}
+
+bool is_dir(EXT2_NODE* node){
+    return is_type(node, FILE_TYPE_DIR);
+}
+	
+bool is_type(EXT2_NODE* node, UINT32 type){
+	INODE inode_buf;
+	get_inode(node->fs,node->entry.inode,inode_buf);
+	if ((inode_buf.mode & (0x0F<<11)) == type){
+		return true;
 }

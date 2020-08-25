@@ -203,6 +203,28 @@ int adder(EXT2_FILESYSTEM* fs, void* list, EXT2_NODE* entry)
 	return EXT2_SUCCESS;
 }
 
+int fs_rmdir( DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, const char* name )
+{
+	EXT2_NODE	EXT2Parent;
+	EXT2_NODE	dir;
+
+	shell_entry_to_ext2_entry( parent, &EXT2Parent );
+	ext2_lookup( &EXT2Parent, name, &dir );
+
+	return ext2_rmdir( &dir );
+}
+
+int fs_remove( DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, const char* name )
+{
+	EXT2_NODE	EXT2Parent;
+	EXT2_NODE	file;
+
+	shell_entry_to_ext2_entry( parent, &EXT2Parent );
+	ext2_lookup( &EXT2Parent, name, &file );
+
+	return ext2_remove( &file );
+}
+
 int fs_write(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, SHELL_ENTRY* entry, unsigned long offset, unsigned long length, const char* buffer)
 {
 	EXT2_NODE EXT2Entry;
