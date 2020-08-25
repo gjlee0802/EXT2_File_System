@@ -228,10 +228,18 @@ int fs_remove( DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_E
 int fs_write(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, SHELL_ENTRY* entry, unsigned long offset, unsigned long length, const char* buffer)
 {
 	EXT2_NODE EXT2Entry;
-
+	int ret;
 	shell_entry_to_ext2_entry(entry, &EXT2Entry);
 
-	return ext2_write(&EXT2Entry, offset, length, buffer);
+	ret = ext2_write(&EXT2Entry, offset, length, buffer);
+	INODE inode;
+	get_inode(EXT2Entry.fs, 11, &inode);
+	PRINTF("getsize : %u\n", inode.size);
+	ext2_entry_to_shell_entry(EXT2Entry.fs, &EXT2Entry, entry);
+	PRINTF("SHELLENTRY name : %s\n", entry->name);
+	PRINTF("SHELLENTRY size : %u\n", entry->size);
+	PRINTF("SHELLENTRY isDir : %d\n", entry->isDirectory);
+	return ret;
 }
 
 void shell_register_filesystem(SHELL_FILESYSTEM* fs)
@@ -293,7 +301,7 @@ int ext2_entry_to_shell_entry(EXT2_FILESYSTEM* fs, const EXT2_NODE* ext2_entry, 
 		shell_entry->isDirectory = 0;
 
 	shell_entry->permition = 0x01FF & inodeBuffer.mode;
-
+	PRINTF("inodeBuffer.size : %u\n", inodeBuffer.size);
 	shell_entry->size = inodeBuffer.size;
 
 	*entry = *ext2_entry;

@@ -1,3 +1,4 @@
+#include "shell.h"
  typedef struct
 {
 	char*	address;
@@ -9,6 +10,7 @@
 
 int ext2_write(EXT2_NODE* file, unsigned long offset, unsigned long length, const char* buffer)
 {
+	PRINTF("ENTER ext2_write\n");
 	BYTE	sector[MAX_SECTOR_SIZE];
 	DWORD	currentOffset, currentBlock, blockSeq = 0;
 	DWORD	blockNumber, sectorNumber, sectorOffset;
@@ -41,10 +43,12 @@ int ext2_write(EXT2_NODE* file, unsigned long offset, unsigned long length, cons
 		blockNumber = currentOffset / MAX_BLOCK_SIZE;
 		if (currentBlock == 0)
 		{
+			PRINTF("expand\n");
 			if (expand_block(file->fs, file->entry.inode) == EXT2_ERROR)
 				return EXT2_ERROR;
 			process_meta_data_for_block_used(file->fs, file->entry.inode);
 			get_inode(file->fs, file->entry.inode, &node);
+			PRINTF("inode.block[0] : %u\n", node.block[0]);
 			currentBlock = node.block[0];
 		}
 
@@ -56,6 +60,7 @@ int ext2_write(EXT2_NODE* file, unsigned long offset, unsigned long length, cons
 			nextBlock = get_data_block_at_inode(file->fs, node, i);
 			if (nextBlock == 0)
 			{
+				PRINTF("expand\n");
 				expand_block(file->fs, file->entry.inode);
 				get_inode(file->fs, file->entry.inode, &node);
 				process_meta_data_for_block_used(file->fs, file->entry.inode);
@@ -85,7 +90,8 @@ int ext2_write(EXT2_NODE* file, unsigned long offset, unsigned long length, cons
 			buffer,
 			copyLength);
 
-		if (data_write(file->fs, 0, currentBlock, sector))
+		//if (data_write(file->fs, 0, currentBlock, sector))
+		if(file->fs->disk->write_sector(file->fs->disk, currentBlock, sector))
 			break;
 
 		buffer += copyLength;
@@ -94,6 +100,9 @@ int ext2_write(EXT2_NODE* file, unsigned long offset, unsigned long length, cons
 
 	node.size = MAX(currentOffset, node.size);
 	set_inode_onto_inode_table(file->fs, file->entry.inode, &node);
+
+	get_inode(file->fs, file->entry.inode, &node);
+	PRINTF("node.size : %u\n", node.size);
 
 	return currentOffset - offset;
 }
@@ -379,11 +388,6 @@ int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, BYTE overwrite)
 	result = get_data_block_at_inode(parent->fs, inodeBuffer, 1);  // 1번째 데이터 블록의 번호 가져옴
 
 	printf("get data block : %d\n", result);
-	/*
-	begin.group = (result - 1) / sb.block_per_group;
-	begin.block = (result - sb.first_data_block_each_group) % sb.block_per_group;	// 그룹 내에서 1부터 시작하는 블록의 인덱스
-	begin.offset = 0;   // 데에터 블록 내 엔트리 위치
-	*/
 	begin.group = parent->location.group;
 	begin.block = parent->location.block;
 	begin.offset = parent->location.offset;
@@ -465,13 +469,14 @@ UINT32 get_available_data_block(EXT2_FILESYSTEM * fs)//, UINT32 inode_num) //ino
 				if (data_num>fs->sb.block_per_group){ // 그룹당 데이터 최대 넘버 초과시 다음 그룹으로 이동
 						break;
 					}
-				if(bit & 0x01==0 && data_num >17){ //비트가 0이고 데이터 넘버가 17 초과이면	
+				if(((bit & 0x01)==0) && (data_num >17)){ //비트가 0이고 데이터 넘버가 17 초과이면	
 					sector[i] |= (0x01 << j-1); // 해당 비트 1로 변환 후
+					PRINTF("datanum : %u\n", data_num);
 					data_write(fs, group_num, fs->gd.start_block_of_block_bitmap, sector); //변환내용 write
-					return data_num+group_num*fs->sb.block_per_group+1; //data_read사용 할 경우 필요 없음
+					return (data_num-1)+group_num*fs->sb.block_per_group+1; //data_read사용 할 경우 필요 없음
 						//실제 블록 번호 반환 <디스크를 섹터로 인덱싱 했을때의 해당 블록 번호>
 				}
-				bit >>1;
+				bit = bit >> 1;
 				j++;
 			}
 		}//그룹 하나 돌고
@@ -529,6 +534,7 @@ int expand_indirect(EXT2_FILESYSTEM *fs, INODE *inodeBuffer, UINT32 inode_num, c
 
 	indirect_pointer_per_sector = MAX_SECTOR_SIZE / sizeof(UINT32);
 
+	PRINTF("indirect : %u\n", block_number);
 	if ( block_number == 13 )	// check if single indirect block is needed
 	{
 		// expand single indirect
@@ -538,118 +544,205 @@ int expand_indirect(EXT2_FILESYSTEM *fs, INODE *inodeBuffer, UINT32 inode_num, c
 			return EXT2_ERROR;
 		inodeBuffer->blocks++;
 	}
-	else if ( block_number <= 12 + indirect_pointer_per_sector + indirect_pointer_per_sector*indirect_pointer_per_sector )	// check if double indirect block is needed
+	else if( block_number > 13)
 	{
-		index = (block_number - 12 - indirect_pointer_per_sector - 1);	// index: 0부터 시작, triple indirect 범위 내에서의 index
-
-		// expand first layer indirect block (처음으로 첫번째 계층이 필요한 경우)
-		if( block_number == 12 + indirect_pointer_per_sector + 1)
+		if ( block_number <= 12 + indirect_pointer_per_sector + indirect_pointer_per_sector*indirect_pointer_per_sector )	// check if double indirect block is needed
 		{
-			new_block = get_available_data_block(fs);
-			inodeBuffer->block[13] = new_block;
-			if(process_meta_data_for_block_used(fs, inode_num) == EXT2_ERROR)	
-				return EXT2_ERROR;
-			inodeBuffer->blocks++;
-		}
-		// expand second layer indirect block 
-		if( index % indirect_pointer_per_sector == 0)
-		{
-			fs->disk->read_sector(fs->disk, inodeBuffer->block[13], sector);
-			block_pointer = (unsigned int *)sector;
+			index = (block_number - 12 - indirect_pointer_per_sector - 1);	// index: 0부터 시작, triple indirect 범위 내에서의 index
 
-			for(int i=0; i < index / indirect_pointer_per_sector; i++)
+			// expand first layer indirect block (처음으로 첫번째 계층이 필요한 경우)
+			if( block_number == 12 + indirect_pointer_per_sector + 1)
 			{
-				block_pointer++;
+				new_block = get_available_data_block(fs);
+				inodeBuffer->block[13] = new_block;
+				if(process_meta_data_for_block_used(fs, inode_num) == EXT2_ERROR)	
+					return EXT2_ERROR;
+				inodeBuffer->blocks++;
 			}
-			new_block = get_available_data_block(fs);
-			*block_pointer = new_block;
-			if(process_meta_data_for_block_used(fs, inode_num) == EXT2_ERROR)	
-				return EXT2_ERROR;
-			inodeBuffer->blocks++;
+			// expand second layer indirect block 
+			if( index % indirect_pointer_per_sector == 0)
+			{
+				fs->disk->read_sector(fs->disk, inodeBuffer->block[13], sector);
+				block_pointer = (unsigned int *)sector;
+
+				for(int i=0; i < index / indirect_pointer_per_sector; i++)
+				{
+					block_pointer++;
+				}
+				new_block = get_available_data_block(fs);
+				*block_pointer = new_block;
+				if(process_meta_data_for_block_used(fs, inode_num) == EXT2_ERROR)	
+					return EXT2_ERROR;
+				inodeBuffer->blocks++;
+			}
+		}
+		else if( block_number <= 12 + indirect_pointer_per_sector + 
+		indirect_pointer_per_sector*indirect_pointer_per_sector + 
+		indirect_pointer_per_sector*indirect_pointer_per_sector*indirect_pointer_per_sector )	// check if triple indirect block is needed
+		{
+			index = (block_number - 12 - indirect_pointer_per_sector - indirect_pointer_per_sector * indirect_pointer_per_sector - 1);	//index: 0부터 시작, triple indirect 범위 내에서의 index
+
+			// expand first layer indirect block
+			if(block_number == 12 + indirect_pointer_per_sector + indirect_pointer_per_sector*indirect_pointer_per_sector + 1)
+			{
+				new_block = get_available_data_block(fs);
+				inodeBuffer->block[14] = new_block;
+				if(process_meta_data_for_block_used(fs, inode_num) == EXT2_ERROR)	
+					return EXT2_ERROR;
+				inodeBuffer->blocks++;
+			}
+			// expand second layer indirect block
+			if( index % (indirect_pointer_per_sector*indirect_pointer_per_sector) == 0)
+			{
+				fs->disk->read_sector(fs->disk, inodeBuffer->block[14], sector);	// read first layer indirect
+				block_pointer = (unsigned int *)sector;
+
+				for(int i=0; i < index / indirect_pointer_per_sector; i++)
+				{
+					block_pointer++;
+				}
+				new_block = get_available_data_block(fs);
+				*block_pointer = new_block;											// get new block for second layer indirect
+				if(process_meta_data_for_block_used(fs, inode_num) == EXT2_ERROR)	
+					return EXT2_ERROR;
+				inodeBuffer->blocks++;
+				
+			}
+			// expand third layer indirect block
+			if( index % indirect_pointer_per_sector == 0)
+			{
+				fs->disk->read_sector(fs->disk, inodeBuffer->block[14], sector);	// read first layer indirect
+				block_pointer = (unsigned int *)sector;
+
+				for(int i=0; i < index / indirect_pointer_per_sector; i++)
+				{
+					block_pointer++;
+				}
+				
+				fs->disk->read_sector(fs->disk, *block_pointer, sector);			// read second layer indirect
+				block_pointer = (unsigned int *)sector;
+
+				for(int i=0; i < index % (indirect_pointer_per_sector*indirect_pointer_per_sector); i++)
+				{
+					block_pointer++;
+				}
+				new_block = get_available_data_block(fs);
+				*block_pointer = new_block;											// get new block for third layer indirect
+				if(process_meta_data_for_block_used(fs, inode_num) == EXT2_ERROR)	
+					return EXT2_ERROR;
+				inodeBuffer->blocks++;
+			}
 		}
 	}
-	else if( block_number <= 12 + indirect_pointer_per_sector + 
-	indirect_pointer_per_sector*indirect_pointer_per_sector + 
-	indirect_pointer_per_sector*indirect_pointer_per_sector*indirect_pointer_per_sector )	// check if triple indirect block is needed
+	else
 	{
-		index = (block_number - 12 - indirect_pointer_per_sector - indirect_pointer_per_sector * indirect_pointer_per_sector - 1);	//index: 0부터 시작, triple indirect 범위 내에서의 index
-
-		// expand first layer indirect block
-		if(block_number == 12 + indirect_pointer_per_sector + indirect_pointer_per_sector*indirect_pointer_per_sector + 1)
-		{
-			new_block = get_available_data_block(fs);
-			inodeBuffer->block[14] = new_block;
-			if(process_meta_data_for_block_used(fs, inode_num) == EXT2_ERROR)	
-				return EXT2_ERROR;
-			inodeBuffer->blocks++;
-		}
-		// expand second layer indirect block
-		if( index % (indirect_pointer_per_sector*indirect_pointer_per_sector) == 0)
-		{
-			fs->disk->read_sector(fs->disk, inodeBuffer->block[14], sector);	// read first layer indirect
-			block_pointer = (unsigned int *)sector;
-
-			for(int i=0; i < index / indirect_pointer_per_sector; i++)
-			{
-				block_pointer++;
-			}
-			new_block = get_available_data_block(fs);
-			*block_pointer = new_block;											// get new block for second layer indirect
-			if(process_meta_data_for_block_used(fs, inode_num) == EXT2_ERROR)	
-				return EXT2_ERROR;
-			inodeBuffer->blocks++;
-			
-		}
-		// expand third layer indirect block
-		if( index % indirect_pointer_per_sector == 0)
-		{
-			fs->disk->read_sector(fs->disk, inodeBuffer->block[14], sector);	// read first layer indirect
-			block_pointer = (unsigned int *)sector;
-
-			for(int i=0; i < index / indirect_pointer_per_sector; i++)
-			{
-				block_pointer++;
-			}
-			
-			fs->disk->read_sector(fs->disk, *block_pointer, sector);			// read second layer indirect
-			block_pointer = (unsigned int *)sector;
-
-			for(int i=0; i < index % (indirect_pointer_per_sector*indirect_pointer_per_sector); i++)
-			{
-				block_pointer++;
-			}
-			new_block = get_available_data_block(fs);
-			*block_pointer = new_block;											// get new block for third layer indirect
-			if(process_meta_data_for_block_used(fs, inode_num) == EXT2_ERROR)	
-				return EXT2_ERROR;
-			inodeBuffer->blocks++;
-		}
-	}	
+		PRINTF("DO NOT EXPAND INDIRECT\n");
+	}
+	
 }
+
+
 
 int expand_block(EXT2_FILESYSTEM * fs, UINT32 inode_num)	// indirect가 필요하면 indirect를 expand하는 방식.
 {
-	INODE inodeBuffer;
+	INODE *inodeBuffer;
 	UINT32 new_block;
 	unsigned int block_number_at_inode;
 	BYTE sector[1024];
+	UINT32 indirect_ptr_per_sector;
 
-	get_inode(fs, inode_num, &inodeBuffer);
-	block_number_at_inode = inodeBuffer.blocks + 1;
-	expand_indirect(fs, &inodeBuffer, inode_num, block_number_at_inode);	// indirect block을 expand 해야하는지 검사, expand가 필요하면 expand.
+	get_inode(fs, inode_num, inodeBuffer);
+	block_number_at_inode = inodeBuffer->blocks + 1;
+	expand_indirect(fs, inodeBuffer, inode_num, block_number_at_inode);	// indirect block을 expand 해야하는지 검사, expand가 필요하면 expand.
 
 	new_block = get_available_data_block(fs);
+	/*
 	ZeroMemory(sector, 0);
 	memcpy(sector, &new_block, sizeof(new_block));
 	if(fs->disk->write_sector(fs->disk, get_data_block_at_inode(fs, inodeBuffer, block_number_at_inode), sector) == EXT2_ERROR)
 	{
 		return EXT2_ERROR;
 	}
+	*/
+	if(block_number_at_inode < 13)
+	{
+		PRINTF("newblock : %d\n", new_block);
+		inodeBuffer->block[block_number_at_inode-1] = new_block;
+	}
+	else
+	{
+		unsigned int *block_pointer;
+		unsigned int temp;
+		unsigned int indirect_pointer_per_sector;
+	
+		indirect_pointer_per_sector = MAX_SECTOR_SIZE / sizeof(UINT32);
+		if ( block_number_at_inode <= 12 + indirect_pointer_per_sector )	// single indirect block
+		{
+			fs->disk->read_sector(fs->disk, inodeBuffer->block[12], sector);	
+			block_pointer = (unsigned int *)sector;
+			for(int i=13; i < block_number_at_inode-12; i++)	// 13 ~ 268
+				block_pointer++;
+
+			*block_pointer = new_block;//
+			fs->disk->write_sector(fs->disk, inodeBuffer->block[12], sector);
+		}
+		else if ( block_number_at_inode <= 12 + indirect_pointer_per_sector + indirect_pointer_per_sector * indirect_pointer_per_sector )	// double indirect block
+		{
+			unsigned int index = (block_number_at_inode - 12 - indirect_pointer_per_sector);	// index: 1부터 시작
+			fs->disk->read_sector(fs->disk, inodeBuffer->block[13], sector);
+			block_pointer = (unsigned int *)sector;
+			for(int i=0; i < index / indirect_pointer_per_sector; i++)
+			{
+				block_pointer++;
+			}
+			temp = *block_pointer;
+			fs->disk->read_sector(fs->disk, *block_pointer, sector);
+			block_pointer = (unsigned int *)sector;
+			for(int i=1; i < index % indirect_pointer_per_sector; i++)
+			{
+				block_pointer++;
+			}
+
+			*block_pointer = new_block;	//
+			fs->disk->write_sector(fs->disk, temp, sector);
+		}
+		else if ( block_number_at_inode <= 12 + indirect_pointer_per_sector + indirect_pointer_per_sector * indirect_pointer_per_sector +
+		indirect_pointer_per_sector * indirect_pointer_per_sector * indirect_pointer_per_sector )	// triple indirect block
+		{
+			unsigned int index = (block_number_at_inode - 12 - indirect_pointer_per_sector - indirect_pointer_per_sector * indirect_pointer_per_sector);
+			fs->disk->read_sector(fs->disk, inodeBuffer->block[14], sector);
+			block_pointer = (unsigned int *)sector;
+			for(int i=0; i < index / (indirect_pointer_per_sector*indirect_pointer_per_sector); i++)
+			{
+				block_pointer++;
+			}
+			fs->disk->read_sector(fs->disk, *block_pointer, sector);
+			block_pointer = (unsigned int *)sector;
+			for(int i=0; i < index / indirect_pointer_per_sector; i++)
+			{
+				block_pointer++;
+			}
+			temp = *block_pointer;
+			fs->disk->read_sector(fs->disk, *block_pointer, sector);
+			block_pointer = (unsigned int *)sector;
+			for(int i=1; i < index % (indirect_pointer_per_sector*indirect_pointer_per_sector); i++)
+			{
+				block_pointer++;
+			}
+
+			*block_pointer = new_block;	//
+			fs->disk->write_sector(fs->disk, temp, sector);
+		}
+	}
+	
+	
 	if(process_meta_data_for_block_used(fs, inode_num) == EXT2_ERROR)
 	{
 		return EXT2_ERROR;
 	}
-	inodeBuffer.blocks++;
+	inodeBuffer->blocks++;
+	PRINTF("expand ' blocks : %u\n", inodeBuffer->blocks);
+	PRINTF("expand ' block[0] : %u\n", inodeBuffer->block[0]);
 	return EXT2_SUCCESS;
 }
 
@@ -980,6 +1073,7 @@ int read_root_sector(EXT2_FILESYSTEM* fs, BYTE* sector)
 	get_inode(fs, inode, &inodeBuffer);
 	rootBlock = get_data_block_at_inode(fs, inodeBuffer, 1);
 	//data_read(fs, 0, rootBlock, sector);
+	
 	return fs->disk->read_sector(fs->disk, rootBlock, sector);
 }
 
@@ -1018,6 +1112,12 @@ int ext2_create(EXT2_NODE* parent, char* entryName, EXT2_NODE* retEntry)
 	else if (result == -2) return EXT2_ERROR;
 
 	if (insert_entry(parent, retEntry, 0) == EXT2_ERROR) return EXT2_ERROR;
+
+	INODE inodeBuff;
+	PRINTF("retEntry.inode : %u\n", retEntry->entry.inode);
+	get_inode(parent->fs, retEntry->entry.inode, &inodeBuff);
+	PRINTF("retEntry's inode blocks : %u\n", inodeBuff.blocks);
+
 	printf("ext2 create COMPLETE\n");
 	return EXT2_SUCCESS;
 }
@@ -1162,21 +1262,23 @@ int get_free_inode_number(EXT2_FILESYSTEM* fs)
 }
 
 // inode 수정한거 실제 테이블에 저장
-int set_inode_onto_inode_table(EXT2_FILESYSTEM *fs, const UINT32 which_inode_num_to_write, INODE * inode_to_write)
+int set_inode_onto_inode_table(EXT2_FILESYSTEM *fs, const UINT32 which_inode_num_to_write, INODE *inode_to_write)
 { 
 	BYTE sector[MAX_SECTOR_SIZE];
-	UINT32 group_num=0;
-	if (which_inode_num_to_write > fs->sb.inode_per_group){
-		group_num++;
-	}
 	INODE* inode_pointer;
-	data_read(fs, group_num, fs->gd.start_block_of_inode_bitmap, sector);
+	UINT32 group_num=0;
+
+	group_num = (which_inode_num_to_write - 1) / fs->sb.inode_per_group; 
+	data_read(fs, group_num, fs->gd.start_block_of_inode_table, sector);
 	inode_pointer = (INODE*)sector;
-	for(int i=0;i<which_inode_num_to_write;i++){
+	/*
+	for(int i=1; i < which_inode_num_to_write; i++)
+	{
 		inode_pointer++;
-	}
-	inode_pointer=inode_to_write;
-	data_write(fs, group_num, fs->gd.start_block_of_inode_bitmap, sector);
+	}*/
+	inode_pointer[which_inode_num_to_write-1] = *inode_to_write;
+	//*inode_pointer=*inode_to_write;
+	data_write(fs, group_num, fs->gd.start_block_of_inode_table, sector);
 }
 
 int ext2_lookup(EXT2_NODE* parent, const char* entryName, EXT2_NODE* retEntry)
@@ -1216,13 +1318,14 @@ int ext2_read_dir(EXT2_NODE* dir, EXT2_NODE_ADD adder, void* list)
 
 		EXT2_DIR_ENTRY *tmp;
 		tmp = (EXT2_DIR_ENTRY *)sector;
-
 		if (dir->entry.inode == 2)
 			// 32 == sizeof(EXT2_DIR_ENTRY), 즉 &sector[0]에 있는 root엔트리를 제외함.
 			read_dir_from_sector(dir->fs, sector + 32, adder, list);
 		else
 			read_dir_from_sector(dir->fs, sector, adder, list);
 	}
+
+	PRINTF("list->first size : %u\n", ((SHELL_ENTRY_LIST*)list)->first->entry.size);
 
 	return EXT2_SUCCESS;
 }
@@ -1232,7 +1335,6 @@ int read_dir_from_sector(EXT2_FILESYSTEM* fs, BYTE* sector, EXT2_NODE_ADD adder,
 	UINT i, max_entries_Per_Sector;
 	EXT2_DIR_ENTRY*   dir;
 	EXT2_NODE   node;
-
 	max_entries_Per_Sector = MAX_SECTOR_SIZE / sizeof(EXT2_DIR_ENTRY);
 	dir = (EXT2_DIR_ENTRY*)sector;
 
@@ -1246,6 +1348,15 @@ int read_dir_from_sector(EXT2_FILESYSTEM* fs, BYTE* sector, EXT2_NODE_ADD adder,
 		{
 			node.fs = fs;
 			node.entry = *dir;
+			
+			INODE inodebuff;
+			PRINTF("");
+			PRINTF("node.entry.inode : %d\n", node.entry.inode);
+			get_inode(fs, node.entry.inode, &inodebuff);
+			PRINTF("readdir SIZE : %u\n", inodebuff.size);
+			PRINTF("readdir BLOCKS : %u\n", inodebuff.blocks);
+			PRINTF("readdir BLOCK[0] : %u\n", inodebuff.block[0]);
+
 			adder(fs, list, &node);
 		}
 		dir++;
