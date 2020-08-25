@@ -43,6 +43,9 @@ int shell_cmd_dumpdatablockbyname(int argc, char * agrv[]);
 int shell_cmd_dumpfileinode(int argc, char * argv[]);
 int shell_cmd_fill(int argc, char* argv[]);
 int shell_cmd_dumpdatablockbynum(int argc, char * argv[]);
+int shell_cmd_rmdir(int argc, char* argv[]);
+int shell_cmd_rm(int argc, char* argv[]);
+int shell_cmd_cat(int argc, char* argv[]);
 
 static COMMAND g_commands[] =
 {
