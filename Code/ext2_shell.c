@@ -16,7 +16,7 @@ int fs_dumpDataSector(DISK_OPERATIONS* disk, int usedSector)
 	end = start + disk->bytesPerSector;
 	printFromP2P(start, end);
 	printf("\n\n");
-
+	PRINTF("dumpDataSector End\n");
 	return EXT2_SUCCESS;
 }
 
@@ -29,12 +29,11 @@ void printFromP2P(char * start, char * end)
 	printf("start address : %#x , end address : %#x\n\n", start, end - 1);
 	start = (char *)(start_int &= ~(0xf));
 	end = (char *)(end_int |= 0xf);
-
+	
 	while (start <= end)
 	{
 		if ((start_int & 0xf) == 0)
 			fprintf(stdout, "\n%#08x   ", start);
-
 		fprintf(stdout, "%02X  ", *(unsigned char *)start);
 		start++;
 		start_int++;
@@ -203,43 +202,13 @@ int adder(EXT2_FILESYSTEM* fs, void* list, EXT2_NODE* entry)
 	return EXT2_SUCCESS;
 }
 
-int fs_rmdir( DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, const char* name )
-{
-	EXT2_NODE	EXT2Parent;
-	EXT2_NODE	dir;
-
-	shell_entry_to_ext2_entry( parent, &EXT2Parent );
-	ext2_lookup( &EXT2Parent, name, &dir );
-
-	return ext2_rmdir( &dir );
-}
-
-int fs_remove( DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, const char* name )
-{
-	EXT2_NODE	EXT2Parent;
-	EXT2_NODE	file;
-
-	shell_entry_to_ext2_entry( parent, &EXT2Parent );
-	ext2_lookup( &EXT2Parent, name, &file );
-
-	return ext2_remove( &file );
-}
-
 int fs_write(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, SHELL_ENTRY* entry, unsigned long offset, unsigned long length, const char* buffer)
 {
 	EXT2_NODE EXT2Entry;
-	int ret;
+
 	shell_entry_to_ext2_entry(entry, &EXT2Entry);
 
-	ret = ext2_write(&EXT2Entry, offset, length, buffer);
-	INODE inode;
-	get_inode(EXT2Entry.fs, 11, &inode);
-	PRINTF("getsize : %u\n", inode.size);
-	ext2_entry_to_shell_entry(EXT2Entry.fs, &EXT2Entry, entry);
-	PRINTF("SHELLENTRY name : %s\n", entry->name);
-	PRINTF("SHELLENTRY size : %u\n", entry->size);
-	PRINTF("SHELLENTRY isDir : %d\n", entry->isDirectory);
-	return ret;
+	return ext2_write(&EXT2Entry, offset, length, buffer);
 }
 
 void shell_register_filesystem(SHELL_FILESYSTEM* fs)
@@ -265,11 +234,12 @@ int	fs_create(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_EN
 	return result;
 }
 
-int shell_entry_to_ext2_entry(const SHELL_ENTRY* shell_entry, EXT2_NODE* fat_entry)
+int shell_entry_to_ext2_entry(const SHELL_ENTRY* shell_entry, EXT2_NODE* ext2_entry)
 {
 	EXT2_NODE* entry = (EXT2_NODE*)shell_entry->pdata;
 
-	*fat_entry = *entry;
+	//*ext2_entry = *entry;
+	memcpy(ext2_entry, entry, sizeof(EXT2_NODE));
 
 	return EXT2_SUCCESS;
 }
@@ -301,10 +271,11 @@ int ext2_entry_to_shell_entry(EXT2_FILESYSTEM* fs, const EXT2_NODE* ext2_entry, 
 		shell_entry->isDirectory = 0;
 
 	shell_entry->permition = 0x01FF & inodeBuffer.mode;
-	PRINTF("inodeBuffer.size : %u\n", inodeBuffer.size);
+
 	shell_entry->size = inodeBuffer.size;
 
-	*entry = *ext2_entry;
+	//*entry = *ext2_entry;
+	memcpy(entry, ext2_entry, sizeof(EXT2_NODE));
 
 	return EXT2_SUCCESS;
 }
