@@ -15,7 +15,7 @@
 #define		NUMBER_OF_SECTORS		( 4096 + 1 )
 #define		NUMBER_OF_GROUPS		2
 #define		NUMBER_OF_INODES		200
-#define		VOLUME_LABLE			"EXT2 BY NC"
+#define		VOLUME_LABLE	"EXT2 BY NC"
 
 #define MAX_SECTOR_SIZE			1024
 #define MAX_BLOCK_SIZE			1024
@@ -84,7 +84,7 @@ typedef struct
 	UINT32  blocks;       /* Blocks count */
 	UINT32  flags;        /* File flags */
 	UINT32  i_reserved1;   // OS dependent 1
-	UINT32  block[EXT2_N_BLOCKS];/* Pointers to blocks */
+	UINT32  block[EXT2_N_BLOCKS];/* Pointers to blocks 0~11 다이렉트, 12 인다이렉트,13 이중, 14삼중 */
 	UINT32  generation;   /* File version (for NFS) */
 	UINT32  file_acl;     /* File ACL */
 	UINT32  dir_acl;      /* Directory ACL */
@@ -102,7 +102,7 @@ typedef struct
 	UINT16 directories_count;
 	BYTE padding[2];
 	BYTE reserved[12];
-} EXT2_GROUP_DESCRIPTOR;
+} EXT2_GROUP_DESCRIPTOR; // 정보입력
 
 typedef struct
 {
@@ -128,9 +128,9 @@ typedef struct
 
 typedef struct
 {
-	UINT32 group;
-	UINT32 block;
-	UINT32 offset;
+	UINT32 group; //그룹번호
+	UINT32 block; //블록번호 
+	UINT32 offset;//섹터내 offset
 } EXT2_DIR_ENTRY_LOCATION;
 
 typedef struct
@@ -162,11 +162,13 @@ int ext2_format(DISK_OPERATIONS* disk);
 int ext2_create(EXT2_NODE* parent, char* entryName, EXT2_NODE* retEntry);
 int ext2_lookup(EXT2_NODE* parent, const char* entryName, EXT2_NODE* retEntry);
 
-UINT32 expand_block(EXT2_FILESYSTEM * , UINT32 );
+int expand_indirect(EXT2_FILESYSTEM *fs, INODE *inodeBuffer, UINT32 inode_num, const unsigned int block_number);
+int expand_block(EXT2_FILESYSTEM * , UINT32 );
+int expand_inode(EXT2_FILESYSTEM* fs, UINT32* inum);
 int fill_super_block(EXT2_SUPER_BLOCK * sb, SECTOR numberOfSectors, UINT32 bytesPerSector);
 int fill_descriptor_block(EXT2_GROUP_DESCRIPTOR * gd, EXT2_SUPER_BLOCK * sb, SECTOR numberOfSectors, UINT32 bytesPerSector);
 int create_root(DISK_OPERATIONS* disk, EXT2_SUPER_BLOCK * sb);
 typedef int(*EXT2_NODE_ADD)(EXT2_FILESYSTEM*,void*, EXT2_NODE*);
-void process_meta_data_for_block_used(EXT2_FILESYSTEM * fs, UINT32 inode_num);
+int process_meta_data_for_block_used(EXT2_FILESYSTEM * fs, UINT32 inode_num);
 #endif
 

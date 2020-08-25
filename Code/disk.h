@@ -7,8 +7,8 @@ typedef struct DISK_OPERATIONS
 {
 	int		( *read_sector	)( struct DISK_OPERATIONS*, SECTOR, void* );
 	int		( *write_sector	)( struct DISK_OPERATIONS*, SECTOR, const void* );
-	SECTOR	numberOfSectors;
-	int		bytesPerSector;
+	SECTOR	numberOfSectors; //4096+1
+	int		bytesPerSector; //1024
 	void*	pdata;
 } DISK_OPERATIONS;
 

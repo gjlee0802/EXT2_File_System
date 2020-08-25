@@ -16,7 +16,7 @@ int fs_dumpDataSector(DISK_OPERATIONS* disk, int usedSector)
 	end = start + disk->bytesPerSector;
 	printFromP2P(start, end);
 	printf("\n\n");
-
+	PRINTF("dumpDataSector End\n");
 	return EXT2_SUCCESS;
 }
 
@@ -29,12 +29,11 @@ void printFromP2P(char * start, char * end)
 	printf("start address : %#x , end address : %#x\n\n", start, end - 1);
 	start = (char *)(start_int &= ~(0xf));
 	end = (char *)(end_int |= 0xf);
-
+	
 	while (start <= end)
 	{
 		if ((start_int & 0xf) == 0)
 			fprintf(stdout, "\n%#08x   ", start);
-
 		fprintf(stdout, "%02X  ", *(unsigned char *)start);
 		start++;
 		start_int++;
@@ -129,20 +128,20 @@ int fs_format(DISK_OPERATIONS* disk, void* param)
 static SHELL_FILE_OPERATIONS g_file =
 {
 	fs_create,
-	NULL,
-	NULL,
+	NULL, // remove
+	NULL, // read
 	fs_write
 };
 
 static SHELL_FS_OPERATIONS   g_fsOprs =
 {
 	fs_read_dir,
-	NULL,
+	NULL, // fs_stat
 	fs_mkdir,
-	NULL,
+	NULL, // fs_rmdir
 	fs_lookup,
 	&g_file,
-	NULL
+	NULL // 
 };
 
 int fs_mount(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, SHELL_ENTRY* root)
@@ -173,8 +172,8 @@ int fs_mount(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, SHELL_ENTRY* ro
 		printf("\n----------------------------------------------\n");
 	}
 
-	printf("%s", ext2_entry.entry.name);
-	ext2_entry_to_shell_entry(fs, &ext2_entry, root);
+	printf("VOLUME_LABEL : %s\n", ext2_entry.entry.name);
+	ext2_entry_to_shell_entry(fs, &ext2_entry, root); //&ext2_entry를 root에 먹임
 
 	return result;
 }
@@ -226,17 +225,21 @@ int	fs_create(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_EN
 	shell_entry_to_ext2_entry(parent, &EXT2Parent);
 
 	result = ext2_create(&EXT2Parent, name, &EXT2Entry);
-
+	PRINTF("----Created Entry----\n");
+	PRINTF("Entry inode: %u \n", EXT2Entry.entry.inode);
+	PRINTF("Entry name : %s \n", EXT2Entry.entry.name);
+	PRINTF("---------------------\n");
 	ext2_entry_to_shell_entry(EXT2Parent.fs, &EXT2Entry, retEntry);
 
 	return result;
 }
 
-int shell_entry_to_ext2_entry(const SHELL_ENTRY* shell_entry, EXT2_NODE* fat_entry)
+int shell_entry_to_ext2_entry(const SHELL_ENTRY* shell_entry, EXT2_NODE* ext2_entry)
 {
 	EXT2_NODE* entry = (EXT2_NODE*)shell_entry->pdata;
 
-	*fat_entry = *entry;
+	//*ext2_entry = *entry;
+	memcpy(ext2_entry, entry, sizeof(EXT2_NODE));
 
 	return EXT2_SUCCESS;
 }
@@ -271,7 +274,8 @@ int ext2_entry_to_shell_entry(EXT2_FILESYSTEM* fs, const EXT2_NODE* ext2_entry, 
 
 	shell_entry->size = inodeBuffer.size;
 
-	*entry = *ext2_entry;
+	//*entry = *ext2_entry;
+	memcpy(entry, ext2_entry, sizeof(EXT2_NODE));
 
 	return EXT2_SUCCESS;
 }
