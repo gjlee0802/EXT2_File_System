@@ -81,11 +81,9 @@ void fs_dumpfileinode(DISK_OPERATIONS * disk, SHELL_FS_OPERATIONS * fsOprs, cons
 void fs_dumpDataBlockByNum(DISK_OPERATIONS * disk, SHELL_FS_OPERATIONS * fsOprs, const SHELL_ENTRY * parent, SHELL_ENTRY * entry, int num)
 {
 	char * start, *end;
-
 	start = ((DISK_MEMORY *)disk->pdata)->address + (1 + num) * disk->bytesPerSector;
 	end = start + disk->bytesPerSector;
 	printFromP2P(start, end);
-
 }
 void printf_by_sel(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, SHELL_ENTRY* entry, const char* name, int sel, int num)
 {
@@ -128,8 +126,8 @@ int fs_format(DISK_OPERATIONS* disk, void* param)
 static SHELL_FILE_OPERATIONS g_file =
 {
 	fs_create,
-	NULL, // remove
-	NULL, // read
+	fs_remove,
+	NULL,//fs_read,
 	fs_write
 };
 
@@ -188,6 +186,7 @@ static SHELL_FILESYSTEM g_fat =
 	fs_mount,
 	fs_umount,
 	fs_format
+
 };
 
 int adder(EXT2_FILESYSTEM* fs, void* list, EXT2_NODE* entry)
@@ -373,4 +372,25 @@ int fs_mkdir(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENT
 	ext2_entry_to_shell_entry(ext2, &EXT2_Entry, retEntry);
 
 	return result;
+}
+
+int fs_remove( DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, const char* name )
+{
+	EXT2_NODE	EXT2Parent;
+	EXT2_NODE	file;
+
+	shell_entry_to_ext2_entry( parent, &EXT2Parent );
+	ext2_lookup( &EXT2Parent, name, &file );
+
+	return ext2_remove( &file );
+}
+int fs_rmdir( DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, const char* name )
+{
+	EXT2_NODE	EXT2Parent;
+	EXT2_NODE	dir;
+
+	shell_entry_to_ext2_entry( parent, &EXT2Parent );
+	ext2_lookup( &EXT2Parent, name, &dir );
+
+	return ext2_rmdir( &dir );
 }

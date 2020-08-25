@@ -43,6 +43,9 @@ int shell_cmd_dumpdatablockbyname(int argc, char * agrv[]);
 int shell_cmd_dumpfileinode(int argc, char * argv[]);
 int shell_cmd_fill(int argc, char* argv[]);
 int shell_cmd_dumpdatablockbynum(int argc, char * argv[]);
+int shell_cmd_rmdir(int argc, char* argv[]);
+int shell_cmd_rm(int argc, char* argv[]);
+int shell_cmd_cat(int argc, char* argv[]);
 
 static COMMAND g_commands[] =
 {
@@ -50,9 +53,11 @@ static COMMAND g_commands[] =
 	{ "mount",	shell_cmd_mount,	COND_UMOUNT	},
 	{ "touch",	shell_cmd_touch,	COND_MOUNT	},
 	{ "fill",	shell_cmd_fill,		COND_MOUNT	},
+	{ "rm",	shell_cmd_rm,	COND_MOUNT	},
 	{ "ls",		shell_cmd_ls,		COND_MOUNT	},
 	{ "format",	shell_cmd_format,	COND_UMOUNT	},
 	{ "mkdir",	shell_cmd_mkdir,	COND_MOUNT	},
+	{ "rmdir",	shell_cmd_rmdir,	COND_MOUNT	},
 	{ "dumpdatablockbynum",	shell_cmd_dumpdatablockbynum, COND_MOUNT },
 	{ "dumpsuperblock" , shell_cmd_dumpsuperblock, COND_MOUNT  },
 	{ "dumpgd" , shell_cmd_dumpgd , COND_MOUNT },
