@@ -7,8 +7,9 @@
 #define MIN( a, b )					( ( a ) < ( b ) ? ( a ) : ( b ) )
 #define MAX( a, b )					( ( a ) > ( b ) ? ( a ) : ( b ) )
 
-int ext2_write(EXT2_NODE* file, unsigned long offset, unsigned long length, const char* buffer)
+int ext2_write(EXT2_NODE* file, EXT2_NODE* parent, unsigned long offset, unsigned long length, const char* buffer)
 {
+
 	PRINTF("[Enter]: ext2_write\n");
 	BYTE	sector[MAX_SECTOR_SIZE];
 	DWORD	currentOffset, currentBlock, blockSeq = 0;
@@ -21,6 +22,7 @@ int ext2_write(EXT2_NODE* file, unsigned long offset, unsigned long length, cons
 	get_inode(file->fs, file->entry.inode, &node);
 	currentBlock = node.block[0];
 	readEnd = offset + length;
+	
 
 	currentOffset = offset;
 
@@ -38,16 +40,20 @@ int ext2_write(EXT2_NODE* file, unsigned long offset, unsigned long length, cons
 	while (currentOffset < readEnd)
 	{
 		DWORD	copyLength;
-
+		
 		blockNumber = currentOffset / blockSize;
 		if (currentBlock == 0)
 		{
 			if (expand_block(file->fs, file->entry.inode) == EXT2_ERROR)
 				return EXT2_ERROR;
+			
 			process_meta_data_for_block_used(file->fs, file->entry.inode);
+			
 			get_inode(file->fs, file->entry.inode, &node);
+			
 			currentBlock = node.block[0];
 		}
+			
 
 		if (blockSeq != blockNumber)
 		{
@@ -73,15 +79,18 @@ int ext2_write(EXT2_NODE* file, unsigned long offset, unsigned long length, cons
 		}
 		sectorNumber = (currentOffset / (MAX_SECTOR_SIZE)) % (MAX_BLOCK_SIZE / MAX_SECTOR_SIZE);
 		sectorOffset = currentOffset % MAX_SECTOR_SIZE;
+		
 
 		copyLength = MIN(MAX_SECTOR_SIZE - sectorOffset, readEnd - currentOffset);
 
 		if (copyLength != MAX_SECTOR_SIZE)
 		{
 			//if (data_read(file->fs, 0, currentBlock, sector))
-			if (file->fs->disk->read_sector(file->fs->disk, currentBlock, sector))
+			if (file->fs->disk->read_sector(file->fs->disk, currentBlock, sector)){
 				break;
+			}
 		}
+		
 
 		memcpy(&sector[sectorOffset],
 			buffer,
@@ -100,6 +109,9 @@ int ext2_write(EXT2_NODE* file, unsigned long offset, unsigned long length, cons
 	PRINTF("entry.inode: %u\n", file->entry.inode);
 	set_inode_onto_inode_table(file->fs, file->entry.inode, &node);
 
+	add_size_of_child(parent, file);
+	
+	
 	return currentOffset - offset;
 }
 
@@ -452,6 +464,7 @@ int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, int overwrite)
 
 		set_entry(parent->fs, &entryNoMore.location, &entryNoMore.entry);
 	}
+	
 	PRINTF("[Out]: insert entry\n");
 }
 
@@ -1398,7 +1411,7 @@ int ext2_remove(EXT2_NODE* file)
 
 	set_entry(file->fs, &file->location, &file->entry);
 	// 해당 inode bitmap 및 data bitmap 0으로 바꾸는 함수 삽입
-
+	free_inodebit(file->fs,file->entry.inode);
 	return EXT2_SUCCESS;
 }
 
@@ -1451,9 +1464,43 @@ void free_databit(EXT2_FILESYSTEM* fs, int bitnum){
 		group_num++;
 	}
 	data_read(fs, group_num, fs->gd.start_block_of_block_bitmap, sector);
-	i = (bitnum+7) / 8;
+	i = bitnum / 8;
 	j = bitnum % 8;
 	sector[i] ^= (0x01 << j-1); // 해당 비트 0으로 변환 후
 	data_write(fs, group_num, fs->gd.start_block_of_block_bitmap, sector); //변환내용 write
 	
+}
+
+void free_inodebit(EXT2_FILESYSTEM* fs, int inodenum){
+	BYTE sector[MAX_SECTOR_SIZE];
+	UINT32 i,j;
+	UINT32 begin=0; 
+	UINT32 group_num = 0;
+	if (inodenum>fs->sb.block_per_group){
+		group_num++;
+	}
+	data_read(fs, group_num, fs->gd.start_block_of_inode_bitmap, sector);
+	i = inodenum / 8;
+	j = inodenum % 8;
+	sector[i] ^= (0x01 << j-1); // 해당 비트 0으로 변환 후
+	data_write(fs, group_num, fs->gd.start_block_of_inode_bitmap, sector); //변환내용 write
+	
+}
+
+void add_size_of_child(EXT2_NODE * parent, EXT2_NODE * child){
+	INODE pInode;
+	INODE cInode;
+	UINT32 group_num = 0;
+	printf("ffff1");
+	get_inode(parent->fs,parent->entry.inode, &pInode);
+	get_inode(child->fs,child->entry.inode, &cInode);
+	printf("ffff2");
+	if (parent->entry.inode > parent->fs->sb.inode_per_group){
+		group_num++;
+	}
+	printf("ffff3");
+	pInode.size += cInode.size;
+	printf("ffff4");
+	set_inode_onto_inode_table(parent->fs, parent->entry.inode, &pInode);
+	printf("ffff5");
 }
