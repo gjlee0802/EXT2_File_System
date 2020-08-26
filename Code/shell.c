@@ -550,7 +550,7 @@ int shell_cmd_cat(int argc, char* argv[])
 		printf("%s lookup failed\n", argv[1]);
 		return -1;
 	}
-	//printf("before read");
+	printf("before read");
 	while (g_fsOprs.fileOprs->read(&g_disk, &g_fsOprs, &g_currentDir, &entry, offset, 1024, buf) > 0)
 	{
 		printf("%s", buf);
