@@ -1561,7 +1561,9 @@ int free_block(EXT2_FILESYSTEM* fs, UINT32 inode_num)
 	PRINTF("expand ' blocks : %u\n", inode.blocks);
 	set_inode_onto_inode_table(fs, inode_num, &inode);
 }
-void free_all_blocks(EXT2_NODE* file){
+
+void free_all_blocks(EXT2_NODE* file)
+{
 	INODE                inodeBuffer;
 	get_inode(file->fs, file->entry.inode, &inodeBuffer);
 	while(inodeBuffer.blocks <= 0){
