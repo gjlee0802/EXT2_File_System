@@ -55,6 +55,7 @@ static COMMAND g_commands[] =
 	{ "fill",	shell_cmd_fill,		COND_MOUNT	},
 	{ "rm",	shell_cmd_rm,	COND_MOUNT	},
 	{ "ls",		shell_cmd_ls,		COND_MOUNT	},
+	{ "cat",		shell_cmd_cat,		COND_MOUNT	},
 	{ "format",	shell_cmd_format,	COND_UMOUNT	},
 	{ "mkdir",	shell_cmd_mkdir,	COND_MOUNT	},
 	{ "rmdir",	shell_cmd_rmdir,	COND_MOUNT	},
@@ -549,7 +550,7 @@ int shell_cmd_cat(int argc, char* argv[])
 		printf("%s lookup failed\n", argv[1]);
 		return -1;
 	}
-
+	//printf("before read");
 	while (g_fsOprs.fileOprs->read(&g_disk, &g_fsOprs, &g_currentDir, &entry, offset, 1024, buf) > 0)
 	{
 		printf("%s", buf);
