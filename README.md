@@ -1,5 +1,5 @@
 # EXT2_File_System
- This is an ext2 file system simulator that works in memory.
+ This is an ext2 file system simulator that works on memory created by NCLAB21st.
 ## Run
      $ make
      $ ./shell
