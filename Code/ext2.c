@@ -912,7 +912,8 @@ int find_entry_at_sector(const BYTE* sector, const BYTE* formattedName, UINT32 b
 	{
 		if( formattedName == NULL )
 		{// formattedName == NULL인 경우
-			
+			if(entry[i].name[0] != DIR_ENTRY_FREE)
+				printf("%d번째 엔트리는 FREE가 아니다.\n",i);
 			if( entry[i].name[0] != DIR_ENTRY_FREE && entry[i].name[0] != DIR_ENTRY_NO_MORE )
 			{
 				printf("call EXT2_SUCCESS\n");
@@ -1637,7 +1638,7 @@ void free_all_blocks(EXT2_NODE* file)
 	}
 };
 
-int ext2_remove(EXT2_NODE* file)
+int ext2_remove(EXT2_NODE* file, EXT2_NODE* parent)
 {
 	INODE                inodeBuffer;
 	get_inode(file->fs, file->entry.inode, &inodeBuffer);
@@ -1651,6 +1652,8 @@ int ext2_remove(EXT2_NODE* file)
 	// 해당 inode bitmap 및 data bitmap 0으로 바꾸는 함수 삽입
 	free_inodebit(file->fs,file->entry.inode);
 	free_all_blocks(file);
+	sub_size_of_child(parent,file);
+	//touch로 생성한 파일은 제거할 경우 세그먼트폴트
 	return EXT2_SUCCESS;
 }
 
@@ -1664,7 +1667,7 @@ int has_sub_entries(EXT2_NODE* file)
 	return EXT2_SUCCESS;
 }
 
-int ext2_rmdir(EXT2_NODE* file)
+int ext2_rmdir(EXT2_NODE* file, EXT2_NODE* parent)
 {
 	INODE                inodeBuffer;
 	get_inode(file->fs, file->entry.inode, &inodeBuffer);
@@ -1679,6 +1682,8 @@ int ext2_rmdir(EXT2_NODE* file)
 	file->entry.name[0] = DIR_ENTRY_FREE;
 	set_entry(file->fs, &file->location, &file->entry);
 	free_all_blocks(file);
+	free_inodebit(file->fs,file->entry.inode);
+	sub_size_of_child(parent,file);
 	// 해당 inode bitmap 및 data bitmap 0으로 바꾸는 함수 삽입
 	return EXT2_SUCCESS;
 }
@@ -1717,14 +1722,25 @@ void add_size_of_child(EXT2_NODE * parent, EXT2_NODE * child){
 	INODE pInode;
 	INODE cInode;
 	UINT32 group_num = 0;
-	printf("ffff1");
 	get_inode(parent->fs,parent->entry.inode, &pInode);
 	get_inode(child->fs,child->entry.inode, &cInode);
-	printf("ffff2");
 	if (parent->entry.inode > parent->fs->sb.inode_per_group){
 		group_num++;
 	}	
 	pInode.size += cInode.size;
+	set_inode_onto_inode_table(parent->fs, parent->entry.inode, &pInode);
+
+}
+void sub_size_of_child(EXT2_NODE * parent, EXT2_NODE * child){
+	INODE pInode;
+	INODE cInode;
+	UINT32 group_num = 0;
+	get_inode(parent->fs,parent->entry.inode, &pInode);
+	get_inode(child->fs,child->entry.inode, &cInode);
+	if (parent->entry.inode > parent->fs->sb.inode_per_group){
+		group_num++;
+	}	
+	pInode.size -= cInode.size;
 	set_inode_onto_inode_table(parent->fs, parent->entry.inode, &pInode);
 
 }

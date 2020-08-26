@@ -27,7 +27,6 @@ extern void printf_by_sel(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, co
 void do_shell(void);
 void unknown_command(void);
 int seperate_string(char* buf, char* ptrs[]);
-
 int shell_cmd_format(int argc, char* argv[]);
 int shell_cmd_mount(int argc, char* argv[]);
 int shell_cmd_touch(int argc, char* argv[]);
