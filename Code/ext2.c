@@ -1,4 +1,4 @@
- typedef struct
+typedef struct
 {
 	char*	address;
 } DISK_MEMORY;
@@ -6,6 +6,62 @@
 #include "ext2.h"
 #define MIN( a, b )					( ( a ) < ( b ) ? ( a ) : ( b ) )
 #define MAX( a, b )					( ( a ) > ( b ) ? ( a ) : ( b ) )
+
+int ext2_read(EXT2_NODE* file, unsigned long offset, unsigned long length, const char* buffer)
+{
+	BYTE	sector[MAX_SECTOR_SIZE];
+	DWORD	currentOffset, currentBlock, blockSeq = 0;
+	DWORD	blockNumber, sectorNumber, sectorOffset;
+	DWORD	readEnd;
+	DWORD	blockSize, blockOffset = 0;
+	INODE node;
+	int i;
+
+	get_inode(file->fs, file->entry.inode, &node);   
+	currentBlock = node.block[0];     
+	readEnd = offset + length;   
+
+	currentOffset = offset;
+	
+	blockSize = MAX_BLOCK_SIZE;
+	blockOffset = blockSize;  
+
+	i = 1;
+	while(offset > blockOffset)  
+	{
+		currentBlock = get_data_block_at_inode(file->fs, node, ++i);   
+		blockOffset += blockSize;
+		blockSeq++;  
+	}
+
+	while( currentOffset < readEnd )
+	{
+		DWORD copyLength;
+
+		blockNumber = currentOffset / MAX_BLOCK_SIZE;  
+		if (blockSeq != blockNumber)
+		{
+			blockSeq++;  
+			++i;   
+			currentBlock = get_data_block_at_inode(file->fs, node, i);
+		}
+		sectorNumber = (currentOffset / (MAX_SECTOR_SIZE)) % (MAX_BLOCK_SIZE / MAX_SECTOR_SIZE);  
+		sectorOffset = currentOffset % MAX_SECTOR_SIZE;  
+		
+		if(file->fs->disk->read_sector(file->fs->disk, currentBlock, sector))
+			break;
+		copyLength = MIN(MAX_SECTOR_SIZE - sectorOffset, readEnd - currentOffset);
+
+		memcpy(&buffer,
+			sector[sectorOffset],
+			copyLength);   
+
+		buffer += copyLength;  
+		currentOffset += copyLength;  
+	}
+
+	return currentOffset - offset;
+}
 
 int ext2_write(EXT2_NODE* file, unsigned long offset, unsigned long length, const char* buffer)
 {
