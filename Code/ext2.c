@@ -263,7 +263,7 @@ int ext2_format(DISK_OPERATIONS* disk)
 	PRINTF("total block count              : %u\n", sb.block_count);
 	PRINTF("byte size of inode structure   : %u\n", sb.inode_structure_size);
 	PRINTF("block byte size                : %u\n", MAX_BLOCK_SIZE);
-	PRINTF("total sectors count            : %u\n", NUMBER_OF_SECTORS);
+	PRINTF("total sectors count            : %u\n", sb.totalSectors);
 	PRINTF("sector byte size               : %u\n", MAX_SECTOR_SIZE);
 	PRINTF("\n");
 
@@ -275,7 +275,7 @@ int ext2_format(DISK_OPERATIONS* disk)
 int fill_super_block(EXT2_SUPER_BLOCK * sb, SECTOR numberOfSectors, UINT32 bytesPerSector)
 {
 	ZeroMemory(sb, sizeof(EXT2_SUPER_BLOCK));
-
+	sb->totalSectors = NUMBER_OF_SECTORS;
 	sb->max_inode_count = NUMBER_OF_INODES;
 	sb->block_count = numberOfSectors;
 	sb->reserved_block_count = 0;
@@ -1715,4 +1715,13 @@ void add_size_of_child(EXT2_NODE * parent, EXT2_NODE * child){
 	pInode.size += cInode.size;
 	set_inode_onto_inode_table(parent->fs, parent->entry.inode, &pInode);
 
+}
+
+
+
+int ext2_df( EXT2_FILESYSTEM* fs, UINT32* totalSectors, UINT32* usedSectors )
+{
+	*totalSectors = fs->sb.totalSectors;
+	*usedSectors = *totalSectors - ( fs->sb.free_block_count );
+	return EXT2_SUCCESS;
 }

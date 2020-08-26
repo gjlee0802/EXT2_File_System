@@ -7,6 +7,8 @@ typedef struct {
 }DISK_MEMORY;
 void printFromP2P(char * start, char * end);
 
+#define FSOPRS_TO_FATFS( a )		( EXT2_FILESYSTEM* )a->pdata
+
 int fs_dumpDataSector(DISK_OPERATIONS* disk, int usedSector)
 {
 	char * start;
@@ -134,7 +136,7 @@ static SHELL_FILE_OPERATIONS g_file =
 static SHELL_FS_OPERATIONS   g_fsOprs =
 {
 	fs_read_dir,
-	NULL, // fs_stat
+	fs_stat, 
 	fs_mkdir,
 <<<<<<< HEAD
 	NULL,	// fs_rmdir
@@ -149,6 +151,7 @@ static SHELL_FS_OPERATIONS   g_fsOprs =
 int fs_mount(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, SHELL_ENTRY* root)
 {
 	EXT2_FILESYSTEM* fs;
+	
 	EXT2_NODE ext2_entry;
 	int result;
 
@@ -321,6 +324,14 @@ int fs_read_dir(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_
 
 	return EXT2_SUCCESS;
 }
+
+int fs_stat( DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, unsigned int* totalSectors, unsigned int* usedSectors )
+{
+	EXT2_NODE	entry;
+	
+	return ext2_df( FSOPRS_TO_FATFS( fsOprs ), totalSectors, usedSectors );
+}
+
 
 int my_strnicmp(const char* str1, const char* str2, int length)
 {
