@@ -46,6 +46,7 @@ int shell_cmd_dumpdatablockbynum(int argc, char * argv[]);
 int shell_cmd_rmdir(int argc, char* argv[]);
 int shell_cmd_rm(int argc, char* argv[]);
 int shell_cmd_cat(int argc, char* argv[]);
+int shell_cmd_df(int argc, char* argv[]);
 
 static COMMAND g_commands[] =
 {
@@ -59,6 +60,7 @@ static COMMAND g_commands[] =
 	{ "format",	shell_cmd_format,	COND_UMOUNT	},
 	{ "mkdir",	shell_cmd_mkdir,	COND_MOUNT	},
 	{ "rmdir",	shell_cmd_rmdir,	COND_MOUNT	},
+	{ "df",	shell_cmd_df,	COND_MOUNT	},
 	{ "dumpdatablockbynum",	shell_cmd_dumpdatablockbynum, COND_MOUNT },
 	{ "dumpsuperblock" , shell_cmd_dumpsuperblock, COND_MOUNT  },
 	{ "dumpgd" , shell_cmd_dumpgd , COND_MOUNT },
@@ -550,7 +552,6 @@ int shell_cmd_cat(int argc, char* argv[])
 		printf("%s lookup failed\n", argv[1]);
 		return -1;
 	}
-	
 	while (g_fsOprs.fileOprs->read(&g_disk, &g_fsOprs, &g_currentDir, &entry, offset, 1024, buf) > 0)
 	{
 		printf("%s", buf);
