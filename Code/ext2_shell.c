@@ -204,10 +204,11 @@ int adder(EXT2_FILESYSTEM* fs, void* list, EXT2_NODE* entry)
 int fs_write(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, SHELL_ENTRY* entry, unsigned long offset, unsigned long length, const char* buffer)
 {
 	EXT2_NODE EXT2Entry;
-
+	EXT2_NODE	EXT2Parent;
 	shell_entry_to_ext2_entry(entry, &EXT2Entry);
+	shell_entry_to_ext2_entry(parent, &EXT2Parent);
 
-	return ext2_write(&EXT2Entry, offset, length, buffer);
+	return ext2_write(&EXT2Entry, &EXT2Parent, offset, length, buffer);
 }
 
 void shell_register_filesystem(SHELL_FILESYSTEM* fs)
