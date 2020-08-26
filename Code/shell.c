@@ -331,7 +331,7 @@ int shell_cmd_touch(int argc, char* argv[])
 
 	if (argc < 2)
 	{
-		printf("usage : touch [files...]\n");
+		printf("usage : touch [file]\n");
 		return 0;
 	}
 
@@ -354,7 +354,7 @@ int shell_cmd_fill(int argc, char* argv[])
 	int			size;
 	int			result;
 	char opt[3] = { 0, };
-	const char CREATE[3] = "-c";
+	const char CREATE[3] = "-c";r
 	const char APPEND[3] = "-a";
 	unsigned long offset;
 
