@@ -17,7 +17,7 @@ int ext2_write(EXT2_NODE* file, unsigned long offset, unsigned long length, cons
 	DWORD	blockSize;
 	INODE node;
 	int i;
-
+	
 	get_inode(file->fs, file->entry.inode, &node);
 	currentBlock = node.block[0];
 	readEnd = offset + length;
