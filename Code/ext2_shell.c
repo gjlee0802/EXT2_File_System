@@ -404,7 +404,7 @@ int fs_remove( DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_E
 	shell_entry_to_ext2_entry( parent, &EXT2Parent );
 	ext2_lookup( &EXT2Parent, name, &file );
 
-	return ext2_remove( &file );
+	return ext2_remove( &file,&EXT2Parent );
 }
 int fs_rmdir( DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, const char* name )
 {
@@ -414,5 +414,5 @@ int fs_rmdir( DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_EN
 	shell_entry_to_ext2_entry( parent, &EXT2Parent );
 	ext2_lookup( &EXT2Parent, name, &dir );
 
-	return ext2_rmdir( &dir );
+	return ext2_rmdir( &dir,&EXT2Parent );
 }
