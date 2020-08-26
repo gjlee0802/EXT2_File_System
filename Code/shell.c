@@ -354,7 +354,7 @@ int shell_cmd_fill(int argc, char* argv[])
 	int			size;
 	int			result;
 	char opt[3] = { 0, };
-	const char CREATE[3] = "-c";r
+	const char CREATE[3] = "-c";
 	const char APPEND[3] = "-a";
 	unsigned long offset;
 
