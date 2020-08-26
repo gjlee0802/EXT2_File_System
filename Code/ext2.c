@@ -903,15 +903,16 @@ int find_entry_at_sector(const BYTE* sector, const BYTE* formattedName, UINT32 b
 {
 	UINT32	i;
 	const EXT2_DIR_ENTRY*	entry = ( EXT2_DIR_ENTRY* )sector;
+	if( formattedName == NULL ) begin = 2;
 
 	for( i = begin; i <= last; i++ )
-	{if( formattedName == NULL )
+	{
+		if( formattedName == NULL )
 		{// formattedName == NULL인 경우
-			if(begin<2){
-				begin = 2;
-			}
+			
 			if( entry[i].name[0] != DIR_ENTRY_FREE && entry[i].name[0] != DIR_ENTRY_NO_MORE )
 			{
+				printf("call EXT2_SUCCESS\n");
 				*number = i;
 				return EXT2_SUCCESS;
 				// 현재 사용중인 첫번째 entry읽어옴
@@ -959,14 +960,17 @@ int find_entry_at_sector(const BYTE* sector, const BYTE* formattedName, UINT32 b
  */
 int find_entry_on_root(EXT2_FILESYSTEM* fs, INODE inode, char* formattedName, EXT2_NODE* ret)
 {
+<<<<<<< HEAD
 	PRINTF("[Enter]: find_entry_on_root\n");
+=======
+	printf("ENTER : find_entry_on_root");
+>>>>>>> ee60c86fe04edbcbb4673af81122e01035fc8e1f
 	BYTE	sector[MAX_SECTOR_SIZE];
 	UINT32	i, number;
 	UINT32	entriesPerSector, lastEntry;
 	INT32	begin = 0;
 	INT32	result;
 	EXT2_DIR_ENTRY* entry;
-	
 	entriesPerSector = fs->disk->bytesPerSector / sizeof(EXT2_DIR_ENTRY);
 	lastEntry = entriesPerSector -1;
 	
@@ -1642,7 +1646,7 @@ int has_sub_entries(EXT2_NODE* file)
 {
 	EXT2_NODE                  subEntry;
 
-	if(!lookup_entry(file->fs, file->entry.inode, NULL, &subEntry))
+	if(lookup_entry(file->fs, file->entry.inode, NULL, &subEntry))
 		return EXT2_ERROR;
 
 	return EXT2_SUCCESS;
@@ -1653,15 +1657,15 @@ int ext2_rmdir(EXT2_NODE* file)
 	INODE                inodeBuffer;
 	get_inode(file->fs, file->entry.inode, &inodeBuffer);
 
-	if(has_sub_entries(file))  
+	if(!has_sub_entries(file)){
 		return EXT2_ERROR;
-	
-	if(!is_dir(file))
+	}
+	if(!is_dir(file)){
 		return EXT2_ERROR;
+	}
 	
 	file->entry.name[0] = DIR_ENTRY_FREE;
 	set_entry(file->fs, &file->location, &file->entry);
-	file->entry.inode;
 	free_all_blocks(file);
 	// 해당 inode bitmap 및 data bitmap 0으로 바꾸는 함수 삽입
 	return EXT2_SUCCESS;
