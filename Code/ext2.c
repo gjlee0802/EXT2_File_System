@@ -960,11 +960,7 @@ int find_entry_at_sector(const BYTE* sector, const BYTE* formattedName, UINT32 b
  */
 int find_entry_on_root(EXT2_FILESYSTEM* fs, INODE inode, char* formattedName, EXT2_NODE* ret)
 {
-<<<<<<< HEAD
 	PRINTF("[Enter]: find_entry_on_root\n");
-=======
-	printf("ENTER : find_entry_on_root");
->>>>>>> ee60c86fe04edbcbb4673af81122e01035fc8e1f
 	BYTE	sector[MAX_SECTOR_SIZE];
 	UINT32	i, number;
 	UINT32	entriesPerSector, lastEntry;
