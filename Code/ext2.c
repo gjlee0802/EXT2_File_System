@@ -18,9 +18,9 @@ int ext2_read(EXT2_NODE* file, unsigned long offset, unsigned long length, const
 	INODE node;
 	int i;
 
-	get_inode(file->fs, file->entry.inode, &node);   
+	get_inode(file->fs, file->entry.inode, &node);
 	currentBlock = node.block[0];     
-	readEnd = offset + length;   
+	readEnd = MIN( offset + length, node.size);
 
 	currentOffset = offset;
 	
@@ -32,7 +32,7 @@ int ext2_read(EXT2_NODE* file, unsigned long offset, unsigned long length, const
 	{
 		currentBlock = get_data_block_at_inode(file->fs, node, ++i);   
 		blockOffset += blockSize;
-		blockSeq++;  
+		blockSeq++;
 	}
 
 	while( currentOffset < readEnd )
@@ -43,7 +43,7 @@ int ext2_read(EXT2_NODE* file, unsigned long offset, unsigned long length, const
 		if (blockSeq != blockNumber)
 		{
 			blockSeq++;  
-			++i;   
+			++i;
 			currentBlock = get_data_block_at_inode(file->fs, node, i);
 		}
 		sectorNumber = (currentOffset / (MAX_SECTOR_SIZE)) % (MAX_BLOCK_SIZE / MAX_SECTOR_SIZE);  
@@ -53,10 +53,9 @@ int ext2_read(EXT2_NODE* file, unsigned long offset, unsigned long length, const
 			break;
 		copyLength = MIN(MAX_SECTOR_SIZE - sectorOffset, readEnd - currentOffset);
 
-		memcpy(&buffer,
-			sector[sectorOffset],
-			copyLength);   
-
+		memcpy(buffer,
+			&sector[sectorOffset],
+			copyLength);
 		buffer += copyLength;  
 		currentOffset += copyLength;  
 	}
@@ -102,7 +101,6 @@ int ext2_write(EXT2_NODE* file, EXT2_NODE* parent, unsigned long offset, unsigne
 		blockNumber = currentOffset / blockSize;
 		if (currentBlock == 0)
 		{
-			PRINTF("[1]");
 			if (expand_block(file->fs, file->entry.inode) == EXT2_ERROR)
 				return EXT2_ERROR;
 			
@@ -121,10 +119,8 @@ int ext2_write(EXT2_NODE* file, EXT2_NODE* parent, unsigned long offset, unsigne
 			nextBlock = get_data_block_at_inode(file->fs, node, i);
 			if (nextBlock == 0)
 			{
-				PRINTF("[2]");
 				expand_block(file->fs, file->entry.inode);
 				get_inode(file->fs, file->entry.inode, &node);
-				PRINTF("node.size: %u\n", node.size);
 				process_meta_data_for_block_used(file->fs, file->entry.inode);
 
 				nextBlock = get_data_block_at_inode(file->fs, node, i);
@@ -156,7 +152,8 @@ int ext2_write(EXT2_NODE* file, EXT2_NODE* parent, unsigned long offset, unsigne
 			copyLength);
 
 		//if (data_write(file->fs, 0, currentBlock, sector))
-		file->fs->disk->write_sector(file->fs->disk, currentBlock, sector);
+		if (file->fs->disk->write_sector(file->fs->disk, currentBlock, sector))
+			break;
 
 		buffer += copyLength;
 		currentOffset += copyLength;
@@ -962,6 +959,7 @@ int find_entry_at_sector(const BYTE* sector, const BYTE* formattedName, UINT32 b
  */
 int find_entry_on_root(EXT2_FILESYSTEM* fs, INODE inode, char* formattedName, EXT2_NODE* ret)
 {
+	PRINTF("[Enter]: find_entry_on_root\n");
 	BYTE	sector[MAX_SECTOR_SIZE];
 	UINT32	i, number;
 	UINT32	entriesPerSector, lastEntry;
@@ -1087,22 +1085,14 @@ int get_inode_table_block(EXT2_FILESYSTEM* fs, const UINT32 inode, BYTE* inodeTa
 	return ret;
 }
 
-/*int prepare_inode_table_block(EXT2_FILESYSTEM* fs, const UINT32 inode, BYTE* inodeTableSector, int* begin)// 예외처리 필요
-{
-	return get_inode_table_block(fs, inode, inodeTableSector, begin);
-}*/
-
 int get_inode(EXT2_FILESYSTEM* fs, const UINT32 inode, INODE *inodeBuffer)
 {
-	PRINTF("[Enter]: get_inode(%u)\n", inode);
+	//PRINTF("[Enter]: get_inode(%u)\n", inode);
 	BYTE sector[MAX_SECTOR_SIZE];
 	int i, begin;
 	UINT32 sectorOffset;
 	INODE *inode_ptr;
-
 	ZeroMemory(sector, sizeof(sector));
-
-	//if( get_inode_table_block(fs, inode, sector, &begin) == -1)
 	if( get_inode_table_block(fs, inode, sector, &sectorOffset) == -1)
 	{
 		PRINTF("ERROR: Cannot read inode table\n");
@@ -1110,6 +1100,7 @@ int get_inode(EXT2_FILESYSTEM* fs, const UINT32 inode, INODE *inodeBuffer)
 	}
 	inode_ptr = (INODE *)sector;	// begin block of the inode Table
 	memcpy(inodeBuffer, &inode_ptr[sectorOffset], sizeof(INODE));
+	//PRINTF("[Out]: get_inode(%u)\n", inode);
 	return EXT2_SUCCESS;
 }
 
