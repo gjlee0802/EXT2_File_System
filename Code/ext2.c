@@ -412,7 +412,6 @@ int set_entry(EXT2_FILESYSTEM* fs, const EXT2_DIR_ENTRY_LOCATION* location, cons
 	EXT2_DIR_ENTRY* entry;
 	if( location->group == 0 && location->block == 0 )
 	{
-		printf("FLAG1\n");
 		read_root_sector(fs, sector);   // 루트 섹터의 내용을 섹터 버퍼에 저장
 		entry = (EXT2_DIR_ENTRY*)sector;   // 섹터 버퍼를 디릭토리 엔트리로써 접근할 수 있도록 type casting
 		//entry[location->offset] = *value;   // 섹터 버퍼 내 엔트리 위치에 newEntry->entry의 값을 set
@@ -421,7 +420,6 @@ int set_entry(EXT2_FILESYSTEM* fs, const EXT2_DIR_ENTRY_LOCATION* location, cons
 	}
 	else
 	{
-		printf("FLAG2\n");
 		// 루트 그룹 외 그릅에 접근 하여 그릅의 섹터 내용을 섹터 버퍼에 저장
 		data_read(fs, location->group, location->block, sector);
 		entry = (EXT2_DIR_ENTRY*)sector;
@@ -775,6 +773,11 @@ int expand_block(EXT2_FILESYSTEM * fs, UINT32 inode_num)	// indirect가 필요�
 			block_pointer[index % (indirect_pointer_per_sector*indirect_pointer_per_sector)] = new_block;	// give new_block
 			fs->disk->write_sector(fs->disk, temp, sector);
 		}
+		else
+		{
+			return EXT2_ERROR;
+		}
+		
 	}
 	
 	
@@ -1088,7 +1091,7 @@ int get_inode_table_block(EXT2_FILESYSTEM* fs, const UINT32 inode, BYTE* inodeTa
 
 int get_inode(EXT2_FILESYSTEM* fs, const UINT32 inode, INODE *inodeBuffer)
 {
-	//PRINTF("[Enter]: get_inode(%u)\n", inode);
+	PRINTF("[Enter]: get_inode(%u)\n", inode);
 	BYTE sector[MAX_SECTOR_SIZE];
 	int i, begin;
 	UINT32 sectorOffset;
@@ -1101,7 +1104,7 @@ int get_inode(EXT2_FILESYSTEM* fs, const UINT32 inode, INODE *inodeBuffer)
 	}
 	inode_ptr = (INODE *)sector;	// begin block of the inode Table
 	memcpy(inodeBuffer, &inode_ptr[sectorOffset], sizeof(INODE));
-	//PRINTF("[Out]: get_inode(%u)\n", inode);
+	PRINTF("[Out]: get_inode(%u)\n", inode);
 	return EXT2_SUCCESS;
 }
 
@@ -1164,7 +1167,9 @@ int get_data_block_at_inode(EXT2_FILESYSTEM *fs, INODE inode, UINT32 number)
 	unsigned int indirect_pointer_per_sector;
 	
 	indirect_pointer_per_sector = MAX_SECTOR_SIZE / sizeof(UINT32);
-	if ( (1 <= number) && (number <= 12) )	// direct block
+	if( number == 0)
+		return EXT2_ERROR;
+	if ( number <= 12 )	// direct block
 	{
 		return inode.block[number - 1];
 	}
@@ -1458,12 +1463,13 @@ int free_indirect(EXT2_FILESYSTEM *fs, INODE *inodeBuffer, const unsigned int bl
 	unsigned int indirect_pointer_per_sector;
 
 	indirect_pointer_per_sector = MAX_SECTOR_SIZE / sizeof(UINT32);
+	
 	ZeroMemory(zero_sector, sizeof(sector));
 
 	if ( block_number == 13 )
 	{
 		// free single indirect
-		fs->disk->write_sector(fs, inodeBuffer->block[12], zero_sector);
+		fs->disk->write_sector(fs->disk, inodeBuffer->block[12], zero_sector);
 		free_databit(fs, inodeBuffer->block[12]);
 	}
 	else if( block_number > 13)
@@ -1528,7 +1534,7 @@ int free_indirect(EXT2_FILESYSTEM *fs, INODE *inodeBuffer, const unsigned int bl
 	}
 	else
 	{
-		PRINTF("DO NOT EXPAND INDIRECT\n");
+		PRINTF("DO NOT FREE INDIRECT\n");
 	}
 
 }
@@ -1548,8 +1554,10 @@ int free_block(EXT2_FILESYSTEM* fs, UINT32 inode_num)
 
 	get_inode(fs, inode_num, &inode);
 	number = inode.blocks;
-
-	if ( (1 <= number) && (number <= 12) )																	// direct block
+	PRINTF("free number: %u \n", number);
+	if (number == 0)
+		return -2;
+	if ( number <= 12 )																	// direct block
 	{
 		// inode.block[number - 1]: datablock number
 		fs->disk->write_sector(fs->disk, inode.block[number - 1], zero_sector);								// set datablock zero
@@ -1607,20 +1615,27 @@ int free_block(EXT2_FILESYSTEM* fs, UINT32 inode_num)
 		return EXT2_ERROR;
 	}
 
-	inode.blocks--;
-	PRINTF("expand ' blocks : %u\n", inode.blocks);
+	PRINTF("after free ' blocks : %u\n", inode.blocks);
 	set_inode_onto_inode_table(fs, inode_num, &inode);
+	
+	PRINTF("[Out]: free_block\n");
+	return EXT2_SUCCESS;
 }
 
 void free_all_blocks(EXT2_NODE* file)
 {
 	INODE                inodeBuffer;
 	get_inode(file->fs, file->entry.inode, &inodeBuffer);
-	printf("~~~~~~~~~~~~~inode의 블럭개수: %d",inodeBuffer.blocks);
-	while(inodeBuffer.blocks > 0){
-		free_block(file->fs, file->entry.inode);
+	int ret;
+
+	while(1)
+	{
+		ret = free_block(file->fs, file->entry.inode);
+		if(ret == -2)
+			break;
+		if(ret == EXT2_ERROR)
+			PRINTF("ERROR: free_block error\n");
 	}
-	
 };
 
 int ext2_remove(EXT2_NODE* file, EXT2_NODE* parent)
