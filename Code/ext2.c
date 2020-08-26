@@ -1383,8 +1383,7 @@ int ext2_mkdir(const EXT2_NODE* parent, const char* entryName, EXT2_NODE* retEnt
 	return EXT2_SUCCESS;
 }
 
-void free_databit(EXT2_FILESYSTEM* fs, int bitnum)
-{
+void free_databit(EXT2_FILESYSTEM* fs, int bitnum){
 	BYTE sector[MAX_SECTOR_SIZE];
 	UINT32 i,j;
 	UINT32 begin=0; 
@@ -1393,7 +1392,7 @@ void free_databit(EXT2_FILESYSTEM* fs, int bitnum)
 		group_num++;
 	}
 	data_read(fs, group_num, fs->gd.start_block_of_block_bitmap, sector);
-	i = (bitnum+7) / 8;
+	i = bitnum / 8;
 	j = bitnum % 8;
 	sector[i] ^= (0x01 << j-1); // 해당 비트 0으로 변환 후
 	data_write(fs, group_num, fs->gd.start_block_of_block_bitmap, sector); //변환내용 write
@@ -1562,7 +1561,14 @@ int free_block(EXT2_FILESYSTEM* fs, UINT32 inode_num)
 	PRINTF("expand ' blocks : %u\n", inode.blocks);
 	set_inode_onto_inode_table(fs, inode_num, &inode);
 }
-
+void free_all_blocks(EXT2_NODE* file){
+	INODE                inodeBuffer;
+	get_inode(file->fs, file->entry.inode, &inodeBuffer);
+	while(inodeBuffer.blocks <= 0){
+		free_block(file->fs, file->entry.inode);
+	}
+	
+};
 
 int ext2_remove(EXT2_NODE* file)
 {
@@ -1577,6 +1583,7 @@ int ext2_remove(EXT2_NODE* file)
 	set_entry(file->fs, &file->location, &file->entry);
 	// 해당 inode bitmap 및 data bitmap 0으로 바꾸는 함수 삽입
 	free_inodebit(file->fs,file->entry.inode);
+	free_all_blocks(file);
 	return EXT2_SUCCESS;
 }
 
@@ -1603,6 +1610,8 @@ int ext2_rmdir(EXT2_NODE* file)
 	
 	file->entry.name[0] = DIR_ENTRY_FREE;
 	set_entry(file->fs, &file->location, &file->entry);
+	file->entry.inode;
+	free_all_blocks(file);
 	// 해당 inode bitmap 및 data bitmap 0으로 바꾸는 함수 삽입
 	return EXT2_SUCCESS;
 }
@@ -1619,21 +1628,7 @@ int is_type(EXT2_NODE* node, UINT32 type){
 	}
 	else return 0;
 }
-void free_databit(EXT2_FILESYSTEM* fs, int bitnum){
-	BYTE sector[MAX_SECTOR_SIZE];
-	UINT32 i,j;
-	UINT32 begin=0; 
-	UINT32 group_num = 0;
-	if (bitnum>fs->sb.block_per_group){
-		group_num++;
-	}
-	data_read(fs, group_num, fs->gd.start_block_of_block_bitmap, sector);
-	i = bitnum / 8;
-	j = bitnum % 8;
-	sector[i] ^= (0x01 << j-1); // 해당 비트 0으로 변환 후
-	data_write(fs, group_num, fs->gd.start_block_of_block_bitmap, sector); //변환내용 write
-	
-}
+
 
 void free_inodebit(EXT2_FILESYSTEM* fs, int inodenum){
 	BYTE sector[MAX_SECTOR_SIZE];
