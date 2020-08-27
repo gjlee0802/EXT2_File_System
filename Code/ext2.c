@@ -1670,7 +1670,7 @@ int has_sub_entries(EXT2_NODE* file)
 {
 	EXT2_NODE                  subEntry;
 
-	if(lookup_entry(file->fs, file->entry.inode, NULL, &subEntry))
+	if(!lookup_entry(file->fs, file->entry.inode, NULL, &subEntry))
 		return EXT2_ERROR;
 
 	return EXT2_SUCCESS;
@@ -1681,7 +1681,7 @@ int ext2_rmdir(EXT2_NODE* file, EXT2_NODE* parent)
 	INODE                inodeBuffer;
 	get_inode(file->fs, file->entry.inode, &inodeBuffer);
 
-	if(!has_sub_entries(file)){
+	if(has_sub_entries(file)){
 		return EXT2_ERROR;
 	}
 	if(!is_dir(file)){

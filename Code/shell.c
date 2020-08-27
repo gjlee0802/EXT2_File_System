@@ -331,7 +331,7 @@ int shell_cmd_touch(int argc, char* argv[])
 
 	if (argc < 2)
 	{
-		printf("usage : touch [files...]\n");
+		printf("usage : touch [file]\n");
 		return 0;
 	}
 
