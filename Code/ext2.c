@@ -500,6 +500,7 @@ int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, int overwrite)
 			// 빈 데이터 블록 할당
 			if(expand_block(parent->fs, parent->entry.inode) != EXT2_SUCCESS)
 				return EXT2_ERROR;
+			process_meta_data_for_block_used(parent->fs, parent->entry.inode);
 
 			ZeroMemory(&inodeBuffer, sizeof(INODE));
 
@@ -550,7 +551,7 @@ UINT32 get_available_data_block(EXT2_FILESYSTEM * fs)//, UINT32 inode_num) //ino
 		}//그룹 하나 돌고
 		group_num++; //다 돌았으면 다음그룹
 	} 
-	return EXT2_ERROR; 
+	return EXT2_ERROR; // -1 : UINT32로는 반환 불가능
 }
 
 int process_meta_data_for_block_used(EXT2_FILESYSTEM * fs, UINT32 inode_num)
@@ -780,11 +781,12 @@ int expand_block(EXT2_FILESYSTEM * fs, UINT32 inode_num)	// indirect가 필요�
 		
 	}
 	
-	
+	/* expand_block 함수 밖에서 따로 호출하도록 함. (expand_indirect는 내부에서 호출)
 	if(process_meta_data_for_block_used(fs, inode_num) == EXT2_ERROR)
 	{
 		return EXT2_ERROR;
 	}
+	*/
 	inodeBuffer.blocks++;
 	PRINTF("expand ' blocks : %u\n", inodeBuffer.blocks);
 	PRINTF("expand ' block[0] : %u\n", inodeBuffer.block[0]);
@@ -1419,7 +1421,8 @@ int ext2_mkdir(const EXT2_NODE* parent, const char* entryName, EXT2_NODE* retEnt
 		return EXT2_ERROR;
 
 	expand_block(parent->fs, retEntry->entry.inode);
-	
+	process_meta_data_for_block_used(parent->fs, retEntry->entry.inode);
+
 	ZeroMemory(&dotNode, sizeof(EXT2_NODE));
 	memset(dotNode.entry.name, 0x20, 11);
 	dotNode.entry.name[0] = '.';
@@ -1471,6 +1474,7 @@ int free_indirect(EXT2_FILESYSTEM *fs, INODE *inodeBuffer, const unsigned int bl
 		// free single indirect
 		fs->disk->write_sector(fs->disk, inodeBuffer->block[12], zero_sector);
 		free_databit(fs, inodeBuffer->block[12]);
+		fs->sb.free_block_count++;
 	}
 	else if( block_number > 13)
 	{
@@ -1485,12 +1489,14 @@ int free_indirect(EXT2_FILESYSTEM *fs, INODE *inodeBuffer, const unsigned int bl
 				
 				fs->disk->write_sector(fs->disk, block_pointer[index / indirect_pointer_per_sector], zero_sector);	// write on first layer's sector
 				free_databit(fs, block_pointer[index / indirect_pointer_per_sector]);
+				fs->sb.free_block_count++;
 			}
 			// free first layer indirect block
 			if( block_number == 12 + indirect_pointer_per_sector + 1)
 			{
 				fs->disk->write_sector(fs->disk, inodeBuffer->block[13], zero_sector);
 				free_databit(fs, inodeBuffer->block[13]);
+				fs->sb.free_block_count++;
 			}
 			
 		}
@@ -1564,6 +1570,7 @@ int free_block(EXT2_FILESYSTEM* fs, UINT32 inode_num)
 		free_databit(fs, inode.block[number-1]);
 		inode.block[number-1] = 0;
 		inode.blocks--;
+		fs->sb.free_block_count++;
 	}
 	else if ( number <= 12 + indirect_pointer_per_sector )													// single indirect block
 	{
@@ -1575,6 +1582,7 @@ int free_block(EXT2_FILESYSTEM* fs, UINT32 inode_num)
 		free_databit(fs, block_pointer[number-13]);
 		free_indirect(fs, &inode, number);
 		inode.blocks--;
+		fs->sb.free_block_count++;
 	}
 	else if ( number <= 12 + indirect_pointer_per_sector + indirect_pointer_per_sector * indirect_pointer_per_sector )	// double indirect block
 	{
@@ -1590,6 +1598,7 @@ int free_block(EXT2_FILESYSTEM* fs, UINT32 inode_num)
 		free_databit(fs, block_pointer[index % indirect_pointer_per_sector]);
 		free_indirect(fs, &inode, number);
 		inode.blocks--;
+		fs->sb.free_block_count++;
 	}
 	else if ( number <= 12 + indirect_pointer_per_sector + indirect_pointer_per_sector * indirect_pointer_per_sector +
 	indirect_pointer_per_sector * indirect_pointer_per_sector * indirect_pointer_per_sector )				// triple indirect block
@@ -1609,13 +1618,13 @@ int free_block(EXT2_FILESYSTEM* fs, UINT32 inode_num)
 		free_databit(fs, block_pointer[index % (indirect_pointer_per_sector*indirect_pointer_per_sector)]);
 		free_indirect(fs, &inode, number);
 		inode.blocks--;
+		fs->sb.free_block_count++;
 	}
 	else
 	{
 		return EXT2_ERROR;
 	}
 
-	PRINTF("after free ' blocks : %u\n", inode.blocks);
 	set_inode_onto_inode_table(fs, inode_num, &inode);
 	
 	PRINTF("[Out]: free_block\n");
@@ -1653,7 +1662,7 @@ int ext2_remove(EXT2_NODE* file, EXT2_NODE* parent)
 	free_inodebit(file->fs,file->entry.inode);
 	free_all_blocks(file);
 	sub_size_of_child(parent,file);
-	//touch로 생성한 파일은 제거할 경우 세그먼트폴트
+	file->fs->sb.free_inode_count++;
 	return EXT2_SUCCESS;
 }
 
@@ -1684,7 +1693,7 @@ int ext2_rmdir(EXT2_NODE* file, EXT2_NODE* parent)
 	free_all_blocks(file);
 	free_inodebit(file->fs,file->entry.inode);
 	sub_size_of_child(parent,file);
-	// 해당 inode bitmap 및 data bitmap 0으로 바꾸는 함수 삽입
+	file->fs->sb.free_inode_count++;
 	return EXT2_SUCCESS;
 }
 
