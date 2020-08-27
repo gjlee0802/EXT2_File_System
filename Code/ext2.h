@@ -49,6 +49,7 @@
 
 typedef struct
 {
+	UINT32 totalSectors;
 	UINT32 max_inode_count;
 	UINT32 block_count;
 	UINT32 reserved_block_count;

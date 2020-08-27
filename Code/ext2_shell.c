@@ -7,6 +7,8 @@ typedef struct {
 }DISK_MEMORY;
 void printFromP2P(char * start, char * end);
 
+#define FSOPRS_TO_FATFS( a )		( EXT2_FILESYSTEM* )a->pdata
+
 int fs_dumpDataSector(DISK_OPERATIONS* disk, int usedSector)
 {
 	char * start;
@@ -22,6 +24,7 @@ int fs_dumpDataSector(DISK_OPERATIONS* disk, int usedSector)
 
 void printFromP2P(char * start, char * end)
 {
+	PRINTF("[Enter]: printFromP2P\n");
 	int start_int, end_int;
 	start_int = (int)start;
 	end_int = (int)end;
@@ -32,9 +35,12 @@ void printFromP2P(char * start, char * end)
 	
 	while (start <= end)
 	{
+		PRINTF("TEST1\n");
 		if ((start_int & 0xf) == 0)
 			fprintf(stdout, "\n%#08x   ", start);
+		PRINTF("TEST2\n");
 		fprintf(stdout, "%02X  ", *(unsigned char *)start);
+		PRINTF("TEST3\n");
 		start++;
 		start_int++;
 	}
@@ -81,11 +87,9 @@ void fs_dumpfileinode(DISK_OPERATIONS * disk, SHELL_FS_OPERATIONS * fsOprs, cons
 void fs_dumpDataBlockByNum(DISK_OPERATIONS * disk, SHELL_FS_OPERATIONS * fsOprs, const SHELL_ENTRY * parent, SHELL_ENTRY * entry, int num)
 {
 	char * start, *end;
-
 	start = ((DISK_MEMORY *)disk->pdata)->address + (1 + num) * disk->bytesPerSector;
 	end = start + disk->bytesPerSector;
 	printFromP2P(start, end);
-
 }
 void printf_by_sel(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, SHELL_ENTRY* entry, const char* name, int sel, int num)
 {
@@ -128,17 +132,17 @@ int fs_format(DISK_OPERATIONS* disk, void* param)
 static SHELL_FILE_OPERATIONS g_file =
 {
 	fs_create,
-	NULL, // remove
-	NULL, // read
+	fs_remove,
+	fs_read,
 	fs_write
 };
 
 static SHELL_FS_OPERATIONS   g_fsOprs =
 {
 	fs_read_dir,
-	NULL, // fs_stat
+	fs_stat, 
 	fs_mkdir,
-	NULL, // fs_rmdir
+	fs_rmdir,
 	fs_lookup,
 	&g_file,
 	NULL // 
@@ -147,6 +151,7 @@ static SHELL_FS_OPERATIONS   g_fsOprs =
 int fs_mount(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, SHELL_ENTRY* root)
 {
 	EXT2_FILESYSTEM* fs;
+	
 	EXT2_NODE ext2_entry;
 	int result;
 
@@ -188,6 +193,7 @@ static SHELL_FILESYSTEM g_fat =
 	fs_mount,
 	fs_umount,
 	fs_format
+
 };
 
 int adder(EXT2_FILESYSTEM* fs, void* list, EXT2_NODE* entry)
@@ -202,13 +208,24 @@ int adder(EXT2_FILESYSTEM* fs, void* list, EXT2_NODE* entry)
 	return EXT2_SUCCESS;
 }
 
-int fs_write(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, SHELL_ENTRY* entry, unsigned long offset, unsigned long length, const char* buffer)
+// while (g_fsOprs.fileOprs->read(&g_disk, &g_fsOprs, &g_currentDir, &entry, offset, 1024, buf) > 0)
+int fs_read(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, SHELL_ENTRY* entry, unsigned long offset, unsigned long length, const char* buffer)
 {
 	EXT2_NODE EXT2Entry;
 
 	shell_entry_to_ext2_entry(entry, &EXT2Entry);
 
-	return ext2_write(&EXT2Entry, offset, length, buffer);
+	return ext2_read(&EXT2Entry, offset, length, buffer);
+}
+
+int fs_write(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, SHELL_ENTRY* entry, unsigned long offset, unsigned long length, const char* buffer)
+{
+	EXT2_NODE EXT2Entry;
+	EXT2_NODE	EXT2Parent;
+	shell_entry_to_ext2_entry(entry, &EXT2Entry);
+	shell_entry_to_ext2_entry(parent, &EXT2Parent);
+
+	return ext2_write(&EXT2Entry, &EXT2Parent, offset, length, buffer);
 }
 
 void shell_register_filesystem(SHELL_FILESYSTEM* fs)
@@ -308,6 +325,14 @@ int fs_read_dir(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_
 	return EXT2_SUCCESS;
 }
 
+int fs_stat( DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, unsigned int* totalSectors, unsigned int* usedSectors )
+{
+	EXT2_NODE	entry;
+	
+	return ext2_df( FSOPRS_TO_FATFS( fsOprs ), totalSectors, usedSectors );
+}
+
+
 int my_strnicmp(const char* str1, const char* str2, int length)
 {
 	char   c1, c2;
@@ -373,4 +398,25 @@ int fs_mkdir(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENT
 	ext2_entry_to_shell_entry(ext2, &EXT2_Entry, retEntry);
 
 	return result;
+}
+
+int fs_remove( DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, const char* name )
+{
+	EXT2_NODE	EXT2Parent;
+	EXT2_NODE	file;
+
+	shell_entry_to_ext2_entry( parent, &EXT2Parent );
+	ext2_lookup( &EXT2Parent, name, &file );
+
+	return ext2_remove( &file,&EXT2Parent );
+}
+int fs_rmdir( DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, const SHELL_ENTRY* parent, const char* name )
+{
+	EXT2_NODE	EXT2Parent;
+	EXT2_NODE	dir;
+
+	shell_entry_to_ext2_entry( parent, &EXT2Parent );
+	ext2_lookup( &EXT2Parent, name, &dir );
+
+	return ext2_rmdir( &dir,&EXT2Parent );
 }

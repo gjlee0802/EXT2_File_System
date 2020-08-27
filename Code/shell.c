@@ -27,7 +27,6 @@ extern void printf_by_sel(DISK_OPERATIONS* disk, SHELL_FS_OPERATIONS* fsOprs, co
 void do_shell(void);
 void unknown_command(void);
 int seperate_string(char* buf, char* ptrs[]);
-
 int shell_cmd_format(int argc, char* argv[]);
 int shell_cmd_mount(int argc, char* argv[]);
 int shell_cmd_touch(int argc, char* argv[]);
@@ -43,6 +42,10 @@ int shell_cmd_dumpdatablockbyname(int argc, char * agrv[]);
 int shell_cmd_dumpfileinode(int argc, char * argv[]);
 int shell_cmd_fill(int argc, char* argv[]);
 int shell_cmd_dumpdatablockbynum(int argc, char * argv[]);
+int shell_cmd_rmdir(int argc, char* argv[]);
+int shell_cmd_rm(int argc, char* argv[]);
+int shell_cmd_cat(int argc, char* argv[]);
+int shell_cmd_df(int argc, char* argv[]);
 
 static COMMAND g_commands[] =
 {
@@ -50,9 +53,13 @@ static COMMAND g_commands[] =
 	{ "mount",	shell_cmd_mount,	COND_UMOUNT	},
 	{ "touch",	shell_cmd_touch,	COND_MOUNT	},
 	{ "fill",	shell_cmd_fill,		COND_MOUNT	},
+	{ "rm",	shell_cmd_rm,	COND_MOUNT	},
 	{ "ls",		shell_cmd_ls,		COND_MOUNT	},
+	{ "cat",		shell_cmd_cat,		COND_MOUNT	},
 	{ "format",	shell_cmd_format,	COND_UMOUNT	},
 	{ "mkdir",	shell_cmd_mkdir,	COND_MOUNT	},
+	{ "rmdir",	shell_cmd_rmdir,	COND_MOUNT	},
+	{ "df",	shell_cmd_df,	COND_MOUNT	},
 	{ "dumpdatablockbynum",	shell_cmd_dumpdatablockbynum, COND_MOUNT },
 	{ "dumpsuperblock" , shell_cmd_dumpsuperblock, COND_MOUNT  },
 	{ "dumpgd" , shell_cmd_dumpgd , COND_MOUNT },
@@ -116,7 +123,6 @@ void do_shell(void)
 	int i, j = 0;
 
 	printf("%s File system shell\n", g_fs.name);
-
 	while (-1)
 	{
 		printf("NCLAB21 : [/%s]# ", g_currentDir.name);
@@ -325,7 +331,7 @@ int shell_cmd_touch(int argc, char* argv[])
 
 	if (argc < 2)
 	{
-		printf("usage : touch [files...]\n");
+		printf("usage : touch [file]\n");
 		return 0;
 	}
 
@@ -545,7 +551,6 @@ int shell_cmd_cat(int argc, char* argv[])
 		printf("%s lookup failed\n", argv[1]);
 		return -1;
 	}
-
 	while (g_fsOprs.fileOprs->read(&g_disk, &g_fsOprs, &g_currentDir, &entry, offset, 1024, buf) > 0)
 	{
 		printf("%s", buf);
