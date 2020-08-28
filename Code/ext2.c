@@ -458,7 +458,6 @@ int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, int overwrite)
 	
 	if(overwrite==1)
 	{
-		PRINTF("f1\n");
 		begin.offset = 0;
 		process_meta_data_for_inode_used(retEntry,overwrite);
 		set_entry(parent->fs, &begin, &retEntry->entry);
@@ -475,7 +474,6 @@ int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, int overwrite)
 	
 	if( lookup_entry(parent->fs, parent->entry.inode, entryName, &entryNoMore) == EXT2_SUCCESS)
 	{
-		printf("(1)\n");
 		//expand_inode(parent->fs, &retEntry->entry.inode);
 		process_meta_data_for_inode_used(retEntry,overwrite);
 		set_entry(parent->fs, &entryNoMore.location, &retEntry->entry);
@@ -483,8 +481,6 @@ int insert_entry(EXT2_NODE * parent, EXT2_NODE * retEntry, int overwrite)
 	}
 	else	// 빈 엔트리 못 찾았을 경우
 	{
-		printf("(2)\n");
-		PRINTF("f2\n");
 		entryName[0] = DIR_ENTRY_NO_MORE;
 		if( lookup_entry(parent->fs, parent->entry.inode, entryName, &entryNoMore) == EXT2_ERROR)
 			return EXT2_ERROR;
@@ -652,7 +648,7 @@ int expand_indirect(EXT2_FILESYSTEM *fs, INODE *inodeBuffer, UINT32 inode_num, c
 		{
 			index = (block_number - 12 - indirect_pointer_per_sector - indirect_pointer_per_sector * indirect_pointer_per_sector) -1;	//index: 0부터 시작, triple indirect 범위 내에서의 index
 
-			// expand first layer indirect block
+			// expand first layer indirect block (처음으로 첫 계층이 필요한 경우)
 			if(block_number == 12 + indirect_pointer_per_sector + indirect_pointer_per_sector*indirect_pointer_per_sector + 1)
 			{
 				new_block = get_available_data_block(fs);
@@ -1518,6 +1514,7 @@ int free_indirect(EXT2_FILESYSTEM *fs, INODE *inodeBuffer, const unsigned int bl
 				
 				fs->disk->write_sector(fs->disk, block_pointer[index % (indirect_pointer_per_sector*indirect_pointer_per_sector)], zero_sector);
 				free_databit(fs, block_pointer[index % (indirect_pointer_per_sector*indirect_pointer_per_sector)]);
+				fs->sb.free_block_count++;
 			}
 
 			// free second layer indirect block
@@ -1528,6 +1525,7 @@ int free_indirect(EXT2_FILESYSTEM *fs, INODE *inodeBuffer, const unsigned int bl
 				
 				fs->disk->write_sector(fs->disk, block_pointer[index / indirect_pointer_per_sector], zero_sector);
 				free_databit(fs, block_pointer[index / indirect_pointer_per_sector]);
+				fs->sb.free_block_count++;
 			}
 
 			// free first layer indirect block
@@ -1535,6 +1533,7 @@ int free_indirect(EXT2_FILESYSTEM *fs, INODE *inodeBuffer, const unsigned int bl
 			{
 				fs->disk->write_sector(fs->disk, inodeBuffer->block[14], zero_sector);
 				free_databit(fs, inodeBuffer->block[14]);
+				fs->sb.free_block_count++;
 			}
 		}
 	}
@@ -1670,7 +1669,7 @@ int has_sub_entries(EXT2_NODE* file)
 {
 	EXT2_NODE                  subEntry;
 
-	if(!lookup_entry(file->fs, file->entry.inode, NULL, &subEntry))
+	if(lookup_entry(file->fs, file->entry.inode, NULL, &subEntry))
 		return EXT2_ERROR;
 
 	return EXT2_SUCCESS;
@@ -1681,7 +1680,7 @@ int ext2_rmdir(EXT2_NODE* file, EXT2_NODE* parent)
 	INODE                inodeBuffer;
 	get_inode(file->fs, file->entry.inode, &inodeBuffer);
 
-	if(has_sub_entries(file)){
+	if(!has_sub_entries(file)){
 		return EXT2_ERROR;
 	}
 	if(!is_dir(file)){
