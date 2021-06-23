@@ -36,6 +36,12 @@ get_inode와 get_data_block_at_inode 함수는 ls, cd처럼 데이터 블록을 
   data block을 확장하기 위해 추가적인 indirect block이 필요하면 indirect를 확장하는 함수.   
 --------------------------------------------
 - ls -> ext2_read_dir : https://github.com/gjlee0802/EXT2_File_System/blob/master/Code/ext2.c#L1335   
+- read_dir_from_sector : https://github.com/gjlee0802/EXT2_File_System/blob/master/Code/ext2.c#L1366   
 ![read_dir](https://user-images.githubusercontent.com/49184890/123131086-53b5db80-d488-11eb-9d71-cc008bd5ebfd.PNG)   
 
-- 
+--------------------------------------------
+
+- cd -> ext2_lookup : https://github.com/gjlee0802/EXT2_File_System/blob/master/Code/ext2.c#L1322   
+- lookup_entry -> find_entry_on_data : https://github.com/gjlee0802/EXT2_File_System/blob/master/Code/ext2.c#L1026   
+![lookup](https://user-images.githubusercontent.com/49184890/123154260-93d58800-d4a1-11eb-8420-1bff1bc653f5.PNG)   
+
