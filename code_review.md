@@ -31,6 +31,7 @@ get_inode와 get_data_block_at_inode 함수는 ls, cd처럼 데이터 블록을 
 --------------------------------------------
 - expand_block : https://github.com/gjlee0802/EXT2_File_System/blob/master/Code/ext2.c#L704   
   inode 번호를 파라미터로 받아 해당하는 inode의 data block을 확장시켜주는 함수.   
+![expand_block](https://user-images.githubusercontent.com/49184890/123158353-a43c3180-d4a6-11eb-9ea4-fbab7c0807b1.PNG)   
 
 - expand_indirect : https://github.com/gjlee0802/EXT2_File_System/blob/master/Code/ext2.c#L592   
   data block을 확장하기 위해 추가적인 indirect block이 필요하면 indirect를 확장하는 함수.   
