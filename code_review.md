@@ -18,7 +18,8 @@
 
 
 ## 함수
-
+- fill super block : https://github.com/gjlee0802/EXT2_File_System/blob/master/Code/ext2.c#L275   
+---------------------------------------------
 get_inode와 get_data_block_at_inode 함수는 ls, cd처럼 데이터 블록을 참조해야 할 때 쓰임.   
 
 - get_inode : https://github.com/gjlee0802/EXT2_File_System/blob/master/Code/ext2.c#L1094   
